@@ -1,4 +1,4 @@
-#include "Window.h"
+﻿#include "Window.h"
 #include "GraphicCache.h"
 #include "Pad.h"
 #include "TextInput.h"
@@ -142,6 +142,8 @@ bool Window::Fullscreen() const {
 
 void Window::Shutdown() {
     if (g_main == this) g_main = nullptr;
+    // SDL destroys the renderer's textures too; empty the cache while they are alive.
+    if (renderer) GraphicCache::Get().Shutdown();
     if (frame)    { SDL_DestroyTexture(frame);     frame = nullptr; }
     if (renderer) { SDL_DestroyRenderer(renderer); renderer = nullptr; }
     if (window)   { SDL_DestroyWindow(window);     window = nullptr; }

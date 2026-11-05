@@ -1,4 +1,4 @@
-#include "ecs/Resources.h"
+﻿#include "ecs/Resources.h"
 
 #include "core/ConfigManager.h"
 #include "core/Rules.h"
@@ -10,6 +10,7 @@
 #include "ecs/components/Owner.h"
 #include "ecs/components/Sprite.h"
 #include "ecs/components/Transform.h"
+#include "ecs/components/WorldJob.h"
 
 namespace ECS::Resources {
 
@@ -36,6 +37,8 @@ void Exhaust(entt::registry& registry, Physics::Grid& grid, entt::entity resourc
         const auto position = at->position;
         const int x = Physics::TileOf(position.x);
         const int y = Physics::TileOf(position.y);
+        const bool wasPlanted = registry.all_of<Components::Planted>(resource);
+        if (wasPlanted) grid.GetTileMut(x, y).has_tree = false;
         // A map object blocks the tile it stands on; its remains do not.
         grid.SetWalkable(x, y, true);
 
@@ -54,6 +57,8 @@ void Exhaust(entt::registry& registry, Physics::Grid& grid, entt::entity resourc
                 sprite.width = 0;
                 sprite.height = 0;
                 registry.emplace<Components::Sprite>(stump, std::move(sprite));
+                // A newly revealed stump must not appear beneath an unseen tree's memory.
+                if (wasPlanted) registry.emplace<Components::Planted>(stump);
             }
         }
     }

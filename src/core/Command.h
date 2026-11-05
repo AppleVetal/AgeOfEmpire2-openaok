@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <string>
 #include <variant>
@@ -372,6 +372,41 @@ struct DisbandCommand {
     PlayerId player;
 };
 
+enum class WorldJobKind : uint8_t { PlantTree = 1 };
+
+// Передаёт приказ группе жителей выполнить или поставить в очередь работу на клетке.
+struct WorldJobCommand
+{
+  std::vector<entt::entity> workers;
+  WorldJobKind kind = WorldJobKind::PlantTree;
+  int32_t tileX = 0;
+  int32_t tileY = 0;
+  bool append = false;
+  PlayerId player = PLAYER_NONE;
+};
+
+// Отменяет принадлежащий игроку участок работы с возвратом остатка стоимости.
+struct CancelWorldJobCommand
+{
+  entt::entity site = entt::null;
+  PlayerId player = PLAYER_NONE;
+};
+
+enum class PlantShape : uint8_t { Line, Area };
+
+// Описывает проведённую мышью линию или прямоугольную область посадки.
+struct PlantLayoutCommand
+{
+  std::vector<entt::entity> workers;
+  int32_t fromX = 0;
+  int32_t fromY = 0;
+  int32_t toX = 0;
+  int32_t toY = 0;
+  PlantShape shape = PlantShape::Line;
+  bool append = false;
+  PlayerId player = PLAYER_NONE;
+};
+
 using Command = std::variant<MoveCommand, GatherCommand, AttackCommand,
                              BuildCommand, DeleteCommand, TrainCommand,
                              CancelTrainCommand, ResearchCommand, RallyCommand,
@@ -386,6 +421,6 @@ using Command = std::variant<MoveCommand, GatherCommand, AttackCommand,
                              ComputerResourceCommand, SelectionCommand,
                              WaypointCommand, TreasonCommand, DropOffCommand,
                              BackToWorkCommand, FormCommand, DisbandCommand,
-                             DifficultyCommand>;
+                             DifficultyCommand, WorldJobCommand, CancelWorldJobCommand, PlantLayoutCommand>;
 
 } // namespace Core

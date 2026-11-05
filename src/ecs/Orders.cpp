@@ -1,10 +1,12 @@
-#include "ecs/Orders.h"
+﻿#include "ecs/Orders.h"
 
 #include <algorithm>
 
 #include <variant>
 
 #include "ecs/Buildings.h"
+#include "ecs/WorldJobs.h"
+#include "ecs/components/WorldJob.h"
 #include "ecs/Chat.h"
 #include "ecs/Cheats.h"
 #include "ecs/Combat.h"
@@ -76,6 +78,7 @@ bool Commands(const entt::registry& registry, entt::entity unit, Core::PlayerId 
 
 // Whatever the unit was doing stops: a new order replaces the old one.
 void DropCurrentJob(entt::registry& registry, entt::entity unit) {
+    registry.remove<Components::WorldJobQueue>(unit);
     registry.remove<Components::Boarding>(unit);
     // A job broken off for a fight is given up for whatever comes now.
     registry.remove<Components::Interrupted>(unit);
@@ -620,6 +623,10 @@ void Standing(entt::registry& registry, const std::vector<entt::entity>& units,
 
 void Delete(entt::registry& registry, Physics::Grid& grid, const Core::DeleteCommand& cmd) {
     if (!Owns(registry, cmd.building, cmd.player)) return;
+    if (registry.all_of<Components::WorldJob>(cmd.building)) {
+        world_jobs::cancel(registry, grid, cmd.building, cmd.player);
+        return;
+    }
     if (registry.all_of<Components::Building>(cmd.building)) {
         // What is not yet built of it comes back; a foundation never begun
         // leaves nothing behind.
@@ -656,6 +663,12 @@ void Execute(entt::registry& registry, Physics::Grid& grid, const Core::Command&
             Gather(registry, cmd);
         } else if constexpr (std::is_same_v<T, Core::AttackCommand>) {
             Attack(registry, grid, cmd);
+        } else if constexpr (std::is_same_v<T, Core::WorldJobCommand>) {
+            world_jobs::order(registry, grid, cmd);
+        } else if constexpr (std::is_same_v<T, Core::PlantLayoutCommand>) {
+            world_jobs::plantLayout(registry, grid, cmd);
+        } else if constexpr (std::is_same_v<T, Core::CancelWorldJobCommand>) {
+            world_jobs::cancel(registry, grid, cmd.site, cmd.player);
         } else if constexpr (std::is_same_v<T, Core::BuildCommand>) {
             Build(registry, grid, cmd);
         } else if constexpr (std::is_same_v<T, Core::DeleteCommand>) {
@@ -811,6 +824,12 @@ void Interrupt(entt::registry& registry, entt::entity unit) {
     DropCurrentJob(registry, unit);
     registry.remove<Components::Path>(unit);
     if (working) registry.emplace<Components::Interrupted>(unit, kept);
+}
+
+void clearActivity(entt::registry& registry, entt::entity unit)
+{
+  DropCurrentJob(registry, unit);
+  registry.remove<Components::Path>(unit);
 }
 
 void GoBackToWork(entt::registry& registry, const Physics::Grid& grid, entt::entity unit,

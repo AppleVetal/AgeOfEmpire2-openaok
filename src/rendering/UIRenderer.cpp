@@ -1,4 +1,4 @@
-#include "UIRenderer.h"
+﻿#include "UIRenderer.h"
 
 #include "Ground.h"
 #include "HudLayout.h"
@@ -33,6 +33,8 @@
 #include "ecs/components/Resource.h"
 #include "ecs/components/Selectable.h"
 #include "ecs/components/Worker.h"
+#include "ecs/components/WorldJob.h"
+#include "core/Worldcraft.h"
 #include "ecs/BuildingGeometry.h"
 #include "ecs/Buildings.h"
 #include "ecs/Players.h"
@@ -131,6 +133,9 @@ constexpr int kDisbandHelp = 41006;
 // garrison along the top, stop at the end of the second row. A fighting unit:
 // its standing orders, delete and garrison along the top, the stances on the
 // second row, the formations on the third.
+constexpr int kSlotPlantTree = 6;
+constexpr int kSlotPlantArea = 7;
+constexpr int kSlotCancelPlanting = 8;
 constexpr int kSlotBuildEconomic = 1;
 constexpr int kSlotBuildMilitary = 2;
 constexpr int kSlotRepair = 3;
@@ -1477,80 +1482,6 @@ void UIRenderer::DrawMinimapIn(ECS::Simulation& sim, Renderer& renderer, SDL_Ren
 
 namespace {
 
-// The hotkey group a building's own buttons answer to: the Town Center's, the
-// Dock's and each military building's keys are filed apart, so S is the
-// Militia at a Barracks and the Scout at a Stable.
-int HotkeyGroupOfBuilding(int unit_id) {
-    const auto* ui = Core::ConfigManager::Get().GetUnitInterface(unit_id);
-    if (ui == nullptr) return -1;
-    static const struct { const char* name; int group; } kGroups[] = {
-        {"Town Center", Core::Hotkeys::kTownCenter},
-        {"Dock", Core::Hotkeys::kDock},
-        {"Barracks", Core::Hotkeys::kBarracks},
-        {"Archery Range", Core::Hotkeys::kArcheryRange},
-        {"Stable", Core::Hotkeys::kStable},
-        {"Siege Workshop", Core::Hotkeys::kSiegeWorkshop},
-        {"Monastery", Core::Hotkeys::kMonastery},
-        {"Market", Core::Hotkeys::kMarket},
-        {"Castle", Core::Hotkeys::kCastle},
-    };
-    for (const auto& g : kGroups) {
-        if (ui->name == g.name) return g.group;
-    }
-    return -1;
-}
-
-// The item of `group` that trains or places `unit_id`. The hotkey list names
-// an item by its unit line -- "Militia, Man-at-Arms, etc.
-// (swordsmen)", "Build Trebuchet" -- so a unit answers to the item whose
-// names include its own; failing an exact name, one that a word shorter or
-// longer names it ("Tower" the Watch Tower, "Transport" the Transport Ship).
-// The Castle's other button is its unique unit. Remembered per unit: the grid
-// is rebuilt every frame.
-int HotkeyItemFor(int group, int unit_id) {
-    static std::unordered_map<int, int> known[Core::Hotkeys::kGroupCount];
-    if (group < 0 || group >= Core::Hotkeys::kGroupCount) return -1;
-    if (auto it = known[group].find(unit_id); it != known[group].end()) return it->second;
-    const auto* ui = Core::ConfigManager::Get().GetUnitInterface(unit_id);
-    const std::string unit_name = ui ? ui->name : std::string{};
-    int items[64];
-    const int count = Core::Hotkeys::Items(group, items, 64);
-    auto names_of = [](int string_id) {
-        std::vector<std::string> names;
-        std::string text = Core::Strings::Get(string_id);
-        if (const size_t paren = text.find(" ("); paren != std::string::npos) text.resize(paren);
-        size_t start = 0;
-        while (start <= text.size()) {
-            size_t comma = text.find(", ", start);
-            std::string part = text.substr(start, comma == std::string::npos ? std::string::npos
-                                                                             : comma - start);
-            for (const char* prefix : {"Build ", "Create "}) {
-                if (part.rfind(prefix, 0) == 0) part.erase(0, std::strlen(prefix));
-            }
-            if (!part.empty() && part != "etc.") names.push_back(part);
-            if (comma == std::string::npos) break;
-            start = comma + 2;
-        }
-        return names;
-    };
-    int found = -1;
-    for (int pass = 0; pass < 2 && found < 0 && !unit_name.empty(); ++pass) {
-        for (int i = 0; i < count && found < 0; ++i) {
-            for (const std::string& name : names_of(Core::Hotkeys::NameString(group, items[i]))) {
-                const bool exact = unit_name == name;
-                const bool near = unit_name.rfind(name + " ", 0) == 0 ||
-                                  (unit_name.size() > name.size() &&
-                                   unit_name.compare(unit_name.size() - name.size() - 1,
-                                                     std::string::npos, " " + name) == 0);
-                if (pass == 0 ? exact : near) { found = items[i]; break; }
-            }
-        }
-    }
-    if (found < 0 && group == Core::Hotkeys::kCastle) found = 1;   // Build Unique Unit
-    known[group][unit_id] = found;
-    return found;
-}
-
 // Whether a unit's panel has the Garrison button: by its class -- foot
 // soldiers, villagers, cavalry, monks, the King -- and never for unit 700.
 bool GarrisonButton(const entt::registry& registry, entt::entity unit) {
@@ -1657,7 +1588,7 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
         cmd->affordable = CanAfford(registry, rules->costs, rules->cost_count);
         cmd->enabled = enabled;
         cmd->hotkey_group = hotkey_group;
-        cmd->hotkey_item = HotkeyItemFor(hotkey_group, unit_id);
+        cmd->hotkey_item = Core::Hotkeys::unitItem(hotkey_group, unit_id);
     };
 
     // A technology's button, at the slot the tech names.
@@ -1696,7 +1627,10 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
     }
 
     const auto& unit_rules = Core::Rules::Get().units;
-    if (const auto* own_worker = registry.try_get<ECS::Components::Worker>(selected);
+    if (registry.all_of<ECS::Components::WorldJob>(selected)) {
+        BindHotkey(order(kSlotUnitDelete, CommandKind::Delete, kIconDelete, 4941),
+                   Core::Hotkeys::kUnitCommands, Core::Hotkeys::kDelete);
+    } else if (const auto* own_worker = registry.try_get<ECS::Components::Worker>(selected);
         own_worker != nullptr && own_worker->gatherer >= 0) {
         // Something that works as itself -- a fishing ship -- has no build
         // menus: what the dat trains at it (the fish trap) is on its own button.
@@ -1726,6 +1660,18 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
                        HK::kUnitCommands, HK::kGarrison);
             BindHotkey(order(kSlotStop, CommandKind::Stop, kIconStop, 4905),
                        HK::kUnitCommands, HK::kStop);
+            if (auto* command = order(kSlotPlantTree, CommandKind::PlantTree,
+                                      Core::worldcraft::plantRules().buttonIcon, -1)) {
+                command->choice = static_cast<int>(Core::PlantShape::Line);
+                const auto* player = ECS::Players::Find(registry, LocalViewer());
+                command->affordable = player != nullptr &&
+                    ECS::Players::Stock(*player, Core::ResourceType::Wood) >= Core::worldcraft::plantRules().woodCost;
+            }
+            if (auto* command = order(kSlotPlantArea, CommandKind::PlantTree,
+                                      Core::worldcraft::plantRules().buttonIcon, -1)) {
+                command->choice = static_cast<int>(Core::PlantShape::Area);
+            }
+            order(kSlotCancelPlanting, CommandKind::CancelPlanting, kIconCancel, -1);
         } else {
             hotkey_group = Core::Hotkeys::kBuild;
             // Inside a build menu: every building the player can build that
@@ -1888,7 +1834,7 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
                 }
             }
         }
-        hotkey_group = HotkeyGroupOfBuilding(building_id);
+        hotkey_group = Core::Hotkeys::buildingGroup(building_id);
         if (finished) {
             bool trains = false;
             for (int unit_id = 0; unit_id < static_cast<int>(unit_rules.size()); ++unit_id) {
@@ -2007,6 +1953,10 @@ void UIRenderer::OpenBuildMenu(ECS::Simulation& sim, int page) {
 
 UIRenderer::Action UIRenderer::ActivateCommand(const Command& command) {
     switch (command.kind) {
+    case CommandKind::PlantTree:
+        return Action::PlantTree;
+    case CommandKind::CancelPlanting:
+        return Action::CancelPlanting;
     case CommandKind::SwitchPage:
         HudState().page = command.target_page;
         return Action::None;
@@ -2271,6 +2221,18 @@ void DrawCommandPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int 
         DrawIcon(sdl_r, cmd.icon_slp, cmd.icon_frame, SDL_Rect{x + 2, y + 2, 36, 36},
                  LocalViewer(), cmd.enabled ? 255 : 110);
         Bevel(sdl_r, x, y, 40, 40, pressed);
+        if (cmd.kind == UIRenderer::CommandKind::PlantTree) {
+            // Tree symbols arranged as a line or a patch distinguish the two modes.
+            Fill(sdl_r, x + 3, y + 3, 34, 34, kBlack);
+            const int rows = cmd.choice == static_cast<int>(Core::PlantShape::Area) ? 3 : 1;
+            for (int row = 0; row < rows; ++row) {
+                for (int col = 0; col < 3; ++col) {
+                    const int tx = x + 7 + col * 10, ty = y + (rows == 1 ? 15 : 5) + row * 10;
+                    Fill(sdl_r, tx + 2, ty + 4, 2, 5, kWhite);
+                    Fill(sdl_r, tx, ty, 6, 6, kHealthGreen);
+                }
+            }
+        }
         // A number on the button's face -- a Market button's price: white at
         // (3, 2) from the corner, a pixel further while pressed, over black at
         // the four diagonals.
@@ -2346,9 +2308,19 @@ void DrawUnitPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int win
         unit_id >= 0 && unit_id < static_cast<int>(base_units.size()) ? &base_units[unit_id]
                                                                       : nullptr;
 
-    const std::string& name = cfg.GetUnitName(unit_id);
+    const auto* worldJob = registry.try_get<ECS::Components::WorldJob>(selected);
+    const std::string& name = worldJob != nullptr
+        ? Core::worldcraft::text(worldJob->phase == ECS::Components::WorldJobPhase::Working ? "working" : "growing")
+        : cfg.GetUnitName(unit_id);
     if (!name.empty()) {
         Text::Draw(sdl_r, Text::kGeorgia9B, layout.name.x, layout.name.y, name, kBlack);
+    }
+    if (worldJob != nullptr) {
+        const int progress = worldJob->phase == ECS::Components::WorldJobPhase::Working
+            ? (worldJob->workedMs * Core::Fixed32(100) / Core::Fixed32(worldJob->workMs)).ToInt()
+            : 100 - worldJob->growthLeftMs * 100 / Core::worldcraft::plantRules().growthMs;
+        const std::string label = std::to_string(progress) + "%";
+        Text::Draw(sdl_r, Text::kArial8, layout.stat_text.x, layout.stat_text.y, label, kBlack);
     }
 
     // The portrait sits a little into the parchment: two rows of its shadow
@@ -2535,6 +2507,10 @@ const UIRenderer::Command* HoveredCommand(const UIRenderer::Command* commands, i
 } // namespace
 
 std::string UIRenderer::CommandHelp(ECS::Simulation& sim, const Command& command) {
+    if (command.kind == CommandKind::PlantTree)
+        return Core::worldcraft::text(command.choice == static_cast<int>(Core::PlantShape::Area)
+            ? "area" : "line") + ". " + Core::worldcraft::plantHelp();
+    if (command.kind == CommandKind::CancelPlanting) return Core::worldcraft::text("cancel_help");
     auto& cfg = Core::ConfigManager::Get();
     std::string text;
     if (command.kind == CommandKind::Research) {
@@ -2624,6 +2600,13 @@ void UIRenderer::DrawHelpText(ECS::Simulation& sim, SDL_Renderer* sdl_r, int win
         case kEconomicMode: text = Core::Strings::Get(41053); break;
         default: break;
         }
+    } else if (int x = 0, y = 0; [&] {
+        Core::PlantShape shape;
+        return Core::InputManager::Get().planting(x, y, shape);
+    }()) {
+        text = Core::worldcraft::text("choose_site");
+        if (const auto at = text.find("{limit}"); at != std::string::npos)
+            text.replace(at, 7, std::to_string(Core::worldcraft::siteLimit));
     } else if (hud.world_hint >= 0) {
         text = Core::Strings::Get(hud.world_hint);
     }

@@ -1,4 +1,4 @@
-#include "InputManager.h"
+﻿#include "InputManager.h"
 #include "hal/Pad.h"
 #include "hal/Touch.h"
 #include "hal/Window.h"
@@ -20,6 +20,7 @@
 #include "ecs/components/Selectable.h"
 #include "ecs/components/Resource.h"
 #include "ecs/components/Worker.h"
+#include "ecs/components/WorldJob.h"
 #include "ecs/components/Health.h"
 #include "ecs/components/Combat.h"
 #include "ecs/components/Monk.h"
@@ -204,6 +205,17 @@ void InputManager::GivePendingOrder(ECS::Simulation& sim, float x, float y) {
         units.push_back(e);
     }
     if (units.empty()) return;
+
+    if (order == PendingOrder::PlantTree) {
+        const bool append = (SDL_GetModState() & KMOD_SHIFT) != 0;
+        const int tileX = Physics::TileOf(Fixed32(x)), tileY = Physics::TileOf(Fixed32(y));
+        CommandQueue::Get().PushCommand(PlantLayoutCommand{units,
+            isPlantDrag ? plantFromX : tileX, isPlantDrag ? plantFromY : tileY,
+            tileX, tileY, plantShape, append, Core::LocalPlayer()});
+        isPlantDrag = false;
+        if (append) pending_order = PendingOrder::PlantTree;
+        return;
+    }
 
     if (order == PendingOrder::Patrol) {
         CommandQueue::Get().PushCommand(
@@ -738,6 +750,9 @@ void InputManager::UpdateIntent(ECS::Simulation& sim, Rendering::Renderer& rende
         intent = Intent::Place;
         Rendering::UIRenderer::SetWorldHint(3052);
         return;
+    case PendingOrder::PlantTree:
+        intent = Intent::Place;
+        return;
     case PendingOrder::Flare:
         intent = Intent::Signal;
         Rendering::UIRenderer::SetWorldHint(3097);
@@ -1139,6 +1154,26 @@ void InputManager::RunCommand(ECS::Simulation& sim, const Rendering::UIRenderer:
     case Rendering::UIRenderer::Action::Repair:
         pending_order = PendingOrder::Repair;
         break;
+    case Rendering::UIRenderer::Action::PlantTree:
+        pending_order = PendingOrder::PlantTree;
+        plantShape = static_cast<Core::PlantShape>(cmd.choice);
+        isPlantDrag = false;
+        break;
+    case Rendering::UIRenderer::Action::CancelPlanting: {
+        std::vector<entt::entity> sites;
+        for (const auto worker : registry.view<ECS::Components::WorldJobQueue,
+                ECS::Components::Selectable, ECS::Components::Owner>()) {
+            if (!registry.get<ECS::Components::Selectable>(worker).is_selected ||
+                registry.get<ECS::Components::Owner>(worker).player_id != Core::LocalPlayer()) continue;
+            const auto& queue = registry.get<ECS::Components::WorldJobQueue>(worker);
+            for (uint16_t i = 0; i < queue.count; ++i) sites.push_back(queue.sites[i]);
+        }
+        std::sort(sites.begin(), sites.end());
+        sites.erase(std::unique(sites.begin(), sites.end()), sites.end());
+        for (const auto site : sites)
+            CommandQueue::Get().PushCommand(CancelWorldJobCommand{site, Core::LocalPlayer()});
+        break;
+    }
     case Rendering::UIRenderer::Action::LockGate: {
         // Every selected gate of the player's, locked or unlocked as the
         // button says.
@@ -1264,6 +1299,7 @@ void InputManager::RunCommand(ECS::Simulation& sim, const Rendering::UIRenderer:
         break;
     case Rendering::UIRenderer::Action::CancelOrder:
         placing_building = false;
+        isPlantDrag = false;
         wall_drag = false;
         pending_order = PendingOrder::None;
         break;
@@ -1370,6 +1406,7 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
             // to be placed, an order waiting for its target, a build menu.
             if (placing_building || pending_order != PendingOrder::None) {
                 placing_building = false;
+                isPlantDrag = false;
                 wall_drag = false;
                 pending_order = PendingOrder::None;
             } else {
@@ -1549,6 +1586,12 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
             // A standing order waiting for its target takes this click.
             if (pending_order != PendingOrder::None) {
                 const auto wc = Rendering::Ground::Pick(sim.GetGrid(), ax + cam_x, ay + cam_y);
+                if (pending_order == PendingOrder::PlantTree) {
+                    isPlantDrag = true;
+                    plantFromX = Physics::TileOf(Fixed32(wc.first));
+                    plantFromY = Physics::TileOf(Fixed32(wc.second));
+                    return;
+                }
                 GivePendingOrder(sim, static_cast<float>(wc.first), static_cast<float>(wc.second));
                 return;
             }
@@ -2115,6 +2158,14 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
         }
     }
     else if (event.type == SDL_MOUSEBUTTONUP) {
+        if (event.button.button == SDL_BUTTON_LEFT && isPlantDrag) {
+            const auto wc = Rendering::Ground::Pick(sim.GetGrid(),
+                cam_x + static_cast<float>(event.button.x) / zoom,
+                cam_y + static_cast<float>(event.button.y) / zoom);
+            GivePendingOrder(sim, wc.first, wc.second);
+            isPlantDrag = false;
+            return;
+        }
         if (event.button.button == SDL_BUTTON_LEFT && minimap_dragging) {
             minimap_dragging = false;
             return;  // the press was consumed by the minimap, so is the release

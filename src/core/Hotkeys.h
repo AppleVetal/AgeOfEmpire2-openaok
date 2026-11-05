@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <SDL2/SDL.h>
 #include <string>
 
@@ -118,6 +118,10 @@ enum MouseKey : int {
 };
 
 bool Load(const std::string& path);
+
+// Bindings use dat ids, independent of the translated display names.
+int buildingGroup(int unitId);
+int unitItem(int group, int unitId);
 
 // Whether this key press is the item's binding. Ctrl and Alt must be exactly
 // as bound; Shift must be held when the binding has it and is otherwise free,

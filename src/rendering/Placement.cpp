@@ -1,4 +1,4 @@
-#include "rendering/Placement.h"
+﻿#include "rendering/Placement.h"
 
 #include <algorithm>
 #include <cmath>
@@ -10,6 +10,8 @@
 #include "ecs/Players.h"
 #include "ecs/Techs.h"
 #include "ecs/Walls.h"
+#include "ecs/WorldJobs.h"
+#include "core/Worldcraft.h"
 #include "hal/Window.h"
 #include "rendering/Ground.h"
 #include "rendering/Renderer.h"
@@ -35,7 +37,11 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
     pieces.clear();
     outline = Outline{};
     int button_id = -1;
-    if (!Core::InputManager::Get().PlacingBuilding(button_id)) return false;
+    int plantFromX = 0, plantFromY = 0;
+    Core::PlantShape plantShape;
+    const bool isPlanting = Core::InputManager::Get().planting(plantFromX, plantFromY, plantShape);
+    if (!Core::InputManager::Get().PlacingBuilding(button_id) && !isPlanting) return false;
+    if (isPlanting) button_id = Core::worldcraft::plantRules().treeUnit;
 
     auto& cfg = Core::ConfigManager::Get();
     // What the button actually puts up, and in whose art: the Town Center's
@@ -63,7 +69,7 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
     // is laid tile by tile; anything else is placed with its middle there.
     int tile_x = static_cast<int>(std::floor(world.first + 0.5f));
     int tile_y = static_cast<int>(std::floor(world.second + 0.5f));
-    if (!ECS::Walls::IsWall(unit_id) && !ECS::Walls::IsGate(unit_id)) {
+    if (!isPlanting && !ECS::Walls::IsWall(unit_id) && !ECS::Walls::IsGate(unit_id)) {
         OriginTile(unit_id, world.first, world.second, tile_x, tile_y);
     }
     // Drawn about the footprint's middle, as the finished building is.
@@ -93,7 +99,21 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
         pieces.push_back(piece);
     };
 
-    if (ECS::Walls::IsWall(button_id) || ECS::Walls::IsGate(button_id)) {
+    if (isPlanting) {
+        plantFromX = tile_x; plantFromY = tile_y;
+        Core::InputManager::Get().planting(plantFromX, plantFromY, plantShape);
+        const auto tiles = ECS::world_jobs::layout(grid, plantFromX, plantFromY, tile_x, tile_y, plantShape);
+        const auto& rules = Core::worldcraft::plantRules();
+        const auto art = cfg.GetUnitGraphicById(rules.growingUnit, "idle_graphic0");
+        const auto* player = ECS::Players::Find(registry, viewer);
+        int wood = player != nullptr ? ECS::Players::Stock(*player, Core::ResourceType::Wood) : 0;
+        for (const auto& [x, y] : tiles) {
+            const bool clear = ECS::world_jobs::canPlant(registry, grid, viewer, x, y) && wood >= rules.woodCost;
+            if (clear) wood -= rules.woodCost;
+            add(art.slp_id, 0, static_cast<float>(x), static_cast<float>(y), clear, false);
+        }
+        if (tiles.empty()) add(art.slp_id, 0, static_cast<float>(tile_x), static_cast<float>(tile_y), false, false);
+    } else if (ECS::Walls::IsWall(button_id) || ECS::Walls::IsGate(button_id)) {
         // A wall is previewed segment by segment along the line being dragged,
         // each the piece the line gives it and each checked on its own; a gate
         // as its arch and posts, turned to the wall under the cursor, the arch

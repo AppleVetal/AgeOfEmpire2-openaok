@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <entt/entt.hpp>
 
 #include "core/Command.h"
@@ -16,6 +16,9 @@ namespace ECS::Orders {
 
 // Applies one order. Orders that fail their checks change nothing.
 void Execute(entt::registry& registry, Physics::Grid& grid, const Core::Command& command);
+
+// Drops the unit's current activity after a replacement order has been validated.
+void clearActivity(entt::registry& registry, entt::entity unit);
 
 // What a unit does on its way out of a building with a rally point: walk to the
 // point, or -- a villager rallied onto a resource -- go and gather it. The same

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <map>
 #include <string>
@@ -7,8 +7,11 @@
 #include <entt/entt.hpp>
 
 #include "core/Command.h"
+#include "core/ContentIdentity.h"
 #include "core/GameSetup.h"
 #include "hal/Net.h"
+
+namespace ECS { class Simulation; }
 
 // A network game, in lockstep.
 //
@@ -69,7 +72,9 @@ struct Peer {
     uint32_t pinged = 0;           // the host: when it last asked, in its milliseconds
 };
 
+// Хранит роль узла, соединения, лобби, совместимость данных и состояние синхронизации.
 struct Session {
+    Core::content::Identity content = Core::content::current();
     Role role = Role::Offline;
     Core::PlayerId seat = 0;               // this machine's
     Core::GameSetup setup;
@@ -134,7 +139,7 @@ void Issue(Session& session, const Core::Command& command);
 bool NextTick(Session& session, std::vector<Core::Command>& due);
 
 // After each tick: at the end of a turn, records the world's digest for it.
-void TickDone(Session& session, const entt::registry& registry);
+void TickDone(Session& session, const ECS::Simulation& simulation);
 
 void Leave(Session& session);
 

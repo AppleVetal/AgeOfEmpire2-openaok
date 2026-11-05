@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 
 // Type definitions shared by the whole engine. No dependencies.
@@ -100,6 +100,7 @@ enum class UnitState : uint8_t {
     Building,
     // Mending something of its own side's: a building, a ship, a trebuchet.
     Repairing,
+    WorldJob,
     COUNT
 };
 

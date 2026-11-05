@@ -1,4 +1,4 @@
-#include "save/Recording.h"
+﻿#include "save/Recording.h"
 
 #include <cstring>
 #include <fstream>
@@ -12,7 +12,7 @@ namespace Save {
 
 namespace {
 
-constexpr char kMagic[8] = {'A', 'O', 'K', 'C', 'R', 'E', 'C', '2'};
+constexpr char kMagic[8] = {'A', 'O', 'K', 'C', 'R', 'E', 'C', '4'};
 
 } // namespace
 
@@ -25,7 +25,7 @@ void TakeTurn(Recording& recording, uint64_t tick) {
 
 void Witness(Recording& recording, const ECS::Simulation& sim) {
     if (sim.Tick() % kCheckEvery != 0) return;
-    recording.checks.push_back(Recording::Check{sim.Tick(), ECS::Digest::Of(sim.GetRegistry())});
+    recording.checks.push_back(Recording::Check{sim.Tick(), ECS::Digest::Of(sim)});
 }
 
 void Replay(const Recording& recording, size_t& cursor, uint64_t tick) {
@@ -41,7 +41,7 @@ void Replay(const Recording& recording, size_t& cursor, uint64_t tick) {
 bool StillTheGame(const Recording& recording, size_t& cursor, const ECS::Simulation& sim) {
     while (cursor < recording.checks.size() && recording.checks[cursor].tick < sim.Tick()) ++cursor;
     if (cursor < recording.checks.size() && recording.checks[cursor].tick == sim.Tick()) {
-        return recording.checks[cursor].digest == ECS::Digest::Of(sim.GetRegistry());
+        return recording.checks[cursor].digest == ECS::Digest::Of(sim);
     }
     return true;
 }
@@ -49,6 +49,7 @@ bool StillTheGame(const Recording& recording, size_t& cursor, const ECS::Simulat
 bool WriteRecording(const Recording& recording, const std::string& path) {
     Net::Wire::Writer w;
     w.bytes.insert(w.bytes.end(), std::begin(kMagic), std::end(kMagic));
+    Net::Wire::Write(w, Core::content::current());
     Net::Wire::Write(w, recording.setup);
     w.U8(recording.viewer);
     w.U32(static_cast<uint32_t>(recording.turns.size()));
@@ -78,6 +79,8 @@ bool ReadRecording(const std::string& path, Recording& recording) {
     }
     Net::Wire::Reader r(bytes);
     r.at = sizeof(kMagic);
+    Core::content::Identity identity;
+    if (!Net::Wire::Read(r, identity) || identity != Core::content::current()) return false;
     recording = Recording{};
     if (!Net::Wire::Read(r, recording.setup)) return false;
     recording.viewer = r.U8();

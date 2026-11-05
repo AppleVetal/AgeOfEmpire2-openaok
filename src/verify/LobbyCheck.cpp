@@ -1,4 +1,4 @@
-#include "verify/Harness.h"
+﻿#include "verify/Harness.h"
 
 #include <chrono>
 #include <cstdio>
@@ -154,13 +154,13 @@ bool CheckLobby() {
             while (Net::NextTick(host, due)) {
                 for (const auto& c : due) ECS::Orders::Execute(a.GetRegistry(), a.GetGrid(), c);
                 a.Update(16);
-                Net::TickDone(host, a.GetRegistry());
+                Net::TickDone(host, a);
                 ++ran;
             }
             while (Net::NextTick(client, due)) {
                 for (const auto& c : due) ECS::Orders::Execute(b.GetRegistry(), b.GetGrid(), c);
                 b.Update(16);
-                Net::TickDone(client, b.GetRegistry());
+                Net::TickDone(client, b);
             }
             if (ran < 200) std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }

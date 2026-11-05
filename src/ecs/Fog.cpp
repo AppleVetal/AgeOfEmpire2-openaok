@@ -1,4 +1,4 @@
-#include "ecs/Fog.h"
+﻿#include "ecs/Fog.h"
 
 #include <algorithm>
 #include <utility>
@@ -15,6 +15,7 @@
 #include "ecs/components/Sprite.h"
 #include "ecs/components/SpritePieces.h"
 #include "ecs/components/Transform.h"
+#include "ecs/components/WorldJob.h"
 
 namespace ECS::Fog {
 
@@ -173,6 +174,8 @@ void Going(entt::registry& registry, entt::entity thing) {
     uint16_t players = 0;
     for (Core::PlayerId p = 1; p < Core::kMaxPlayers; ++p) {
         if (Players::Find(registry, p) == nullptr) continue;
+        if (const auto* planted = registry.try_get<C::Planted>(thing);
+            planted != nullptr && (planted->seen & Bit(p)) == 0) continue;
         if (!Vision::Explored(registry, p, x, y) || Vision::Visible(registry, p, x, y)) continue;
         if (remembered != nullptr && (remembered->by & Bit(p)) != 0) continue;
         players = static_cast<uint16_t>(players | Bit(p));

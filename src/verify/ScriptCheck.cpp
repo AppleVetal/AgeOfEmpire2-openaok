@@ -1,4 +1,4 @@
-#include "verify/Harness.h"
+﻿#include "verify/Harness.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -424,7 +424,7 @@ const char* CheckSymbols() {
     const auto& rules = Core::Rules::Get();
     const AI::Lang::Thing* things = AI::Lang::Things();
     for (int t = 0; t < AI::Lang::ThingCount(); ++t) {
-        const std::string_view want = AI::Lang::ExpectedLabel(t);
+        const std::string_view want = AI::Lang::ExpectedDatName(t);
         if (want.empty()) continue;
         const AI::Lang::Thing& thing = things[t];
         std::string have;
@@ -434,7 +434,7 @@ const char* CheckSymbols() {
         } else {
             const int id = thing.ids[thing.line ? 0 : thing.member];
             if (id < 0 || id >= static_cast<int>(rules.unit_text.size())) return "a unit word binds to no unit";
-            have = rules.unit_text[static_cast<size_t>(id)].label;
+            have = rules.unit_text[static_cast<size_t>(id)].name;
         }
         if (have != want) {
             std::fprintf(stderr, "[script] %.*s is %s\n", static_cast<int>(thing.name.size()), thing.name.data(), have.c_str());

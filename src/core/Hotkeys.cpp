@@ -1,4 +1,5 @@
-#include "core/Hotkeys.h"
+﻿#include "core/Hotkeys.h"
+#include "core/Rules.h"
 
 #include <fstream>
 #include <iostream>
@@ -148,6 +149,113 @@ int Items(int group, int* out, int max_out) {
 
 bool CtrlHeld(Uint16 mod) {
     return (mod & (KMOD_CTRL | KMOD_GUI)) != 0;
+}
+
+int buildingGroup(int unitId)
+{
+  switch (unitId)
+  {
+  case 109: return kTownCenter;
+  case 45: return kDock;
+  case 12: return kBarracks;
+  case 87: return kArcheryRange;
+  case 101: return kStable;
+  case 49: return kSiegeWorkshop;
+  case 104: return kMonastery;
+  case 84: return kMarket;
+  case 82: return kCastle;
+  default: return -1;
+  }
+}
+
+int unitItem(int group, int unitId)
+{
+  switch (group)
+  {
+  case kBuild:
+    switch (unitId)
+    {
+    case 70: return 0;   // House
+    case 68: return 1;   // Mill
+    case 103: return 2;  // Blacksmith
+    case 45: return 3;   // Dock
+    case 12: return 4;   // Barracks
+    case 72: return 5;   // Palisade
+    case 84: return 6;   // Market
+    case 117: case 155: return 7;  // Stone wall and its upgrade
+    case 79: case 234: case 235: return 8;  // Tower line
+    case 236: return 9;
+    case 276: return 10;
+    case 50: return 12;
+    case 87: return 13;
+    case 101: return 14;
+    case 49: return 15;
+    case 104: return 16;
+    case 109: return 17;
+    case 209: return 18;
+    case 598: return 19;
+    case 82: return 20;
+    case 562: return 23;
+    case 584: return 24;
+    case 487: case 488: case 490: case 491: return 25;  // Gate orientations
+    case 199: return 27;
+    default: return -1;
+    }
+  case kTownCenter: return unitId == 83 || unitId == 293 ? kVillager : -1;
+  case kDock:
+    switch (unitId)
+    {
+    case 13: return 0;
+    case 17: return 1;
+    case 539: case 21: case 442: return 2;
+    case 420: case 691: return 3;
+    case 529: case 532: return 4;
+    case 527: case 528: return 5;
+    case 545: return 7;
+    case 250: case 533: return 8;
+    default: return -1;
+    }
+  case kBarracks:
+    switch (unitId)
+    {
+    case 74: case 75: case 77: case 473: case 567: return 0;
+    case 93: case 358: return 1;
+    default: return -1;
+    }
+  case kArcheryRange:
+    switch (unitId)
+    {
+    case 4: case 24: case 492: return 0;
+    case 7: case 6: return 1;
+    case 39: case 474: return 2;
+    case 5: return 3;
+    default: return -1;
+    }
+  case kStable:
+    switch (unitId)
+    {
+    case 448: case 546: return 0;
+    case 329: case 330: return 1;
+    case 38: case 283: case 569: return 2;
+    default: return -1;
+    }
+  case kSiegeWorkshop:
+    switch (unitId)
+    {
+    case 35: case 422: case 548: return 0;
+    case 279: case 542: return 1;
+    case 280: case 550: case 588: return 2;
+    case 36: return 3;
+    default: return -1;
+    }
+  case kMonastery: return unitId == 125 ? 0 : -1;
+  case kMarket: return unitId == 128 ? 0 : -1;
+  case kCastle:
+    if (unitId == 42 || unitId == 331) return 0;
+    if (const auto* rules = Rules::Unit(unitId); rules && rules->train_loc == 82) return 1;
+    return -1;
+  default: return -1;
+  }
 }
 
 } // namespace Core::Hotkeys

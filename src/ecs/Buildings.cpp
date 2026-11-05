@@ -1,5 +1,6 @@
-#include "ecs/Buildings.h"
+﻿#include "ecs/Buildings.h"
 #include "ecs/Mortality.h"
+#include "ecs/components/WorldJob.h"
 
 #include "ecs/Events.h"
 #include "ecs/Garrisons.h"
@@ -472,6 +473,11 @@ Site CheckAboveGround(const entt::registry& registry, Core::PlayerId player, int
         if (!seen) return Site::Unexplored;
     }
     const Bounds ground = FootprintBounds({Core::Fixed32(tile_x), Core::Fixed32(tile_y)}, placed);
+    for (const auto site : registry.view<const Components::WorldJob>()) {
+        const auto& job = registry.get<Components::WorldJob>(site);
+        const auto reserved = TileBounds({Core::Fixed32(job.tileX), Core::Fixed32(job.tileY)});
+        if (Overlap(ground, reserved)) return Site::Foundation;
+    }
     auto sites = registry.view<const Components::Building, const Components::Identity,
                                const Components::Transform, const Components::Owner>();
     for (auto site : sites) {

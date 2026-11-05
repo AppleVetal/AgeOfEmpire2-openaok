@@ -1,4 +1,4 @@
-#include "net/Lobby.h"
+﻿#include "net/Lobby.h"
 
 #include <algorithm>
 #include <chrono>
@@ -56,6 +56,7 @@ bool Claimed(const Session& session, int row) {
 std::vector<uint8_t> TableFor(const Session& session, int row) {
     Wire::Writer out;
     out.U8(kTable);
+    Wire::Write(out, session.content);
     out.U8(static_cast<uint8_t>(row));
     out.U8(session.table.restoring ? 1 : 0);
     Wire::Write(out, session.setup);
@@ -349,12 +350,13 @@ bool LobbyMessage(Session& session, const std::vector<uint8_t>& message, Peer* f
     if (session.role == Role::Host && from != nullptr) {
         if (kind == kHello) {
             const uint8_t version = in.U8();
-            const std::string name = in.Text();
-            if (!in.ok || from->row >= 0) return true;
-            if (version != kVersion) {
+            Core::content::Identity identity;
+            if (version != kVersion || !Wire::Read(in, identity) || identity != session.content) {
                 Eject(*from, kWrongVersion);
                 return true;
             }
+            const std::string name = in.Text();
+            if (!in.ok || from->row >= 0) return true;
             const int row = RowFor(session, name);
             if (row < 0) {
                 Eject(*from, kDropped);
@@ -397,6 +399,13 @@ bool LobbyMessage(Session& session, const std::vector<uint8_t>& message, Peer* f
     }
     if (session.role == Role::Client) {
         if (kind == kTable) {
+            Core::content::Identity identity;
+            if (!Wire::Read(in, identity) || identity != session.content)
+            {
+              session.refused = kWrongVersion;
+              session.ejected = true;
+              return true;
+            }
             const int row = in.U8();
             const bool restoring = in.U8() != 0;
             Core::GameSetup settings;

@@ -1,1 +1,4 @@
 *.bat text eol=crlf
+
+# These bytes participate in multiplayer/save compatibility checks.
+/mods/worldcraft/*.json text eol=lf

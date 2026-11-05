@@ -1,4 +1,4 @@
-#include "ecs/Vision.h"
+﻿#include "ecs/Vision.h"
 
 #include <algorithm>
 
@@ -16,6 +16,7 @@
 #include "ecs/components/PartOf.h"
 #include "ecs/components/Sight.h"
 #include "ecs/components/Transform.h"
+#include "ecs/components/WorldJob.h"
 #include "physics/Grid.h"
 
 namespace ECS::Vision {
@@ -346,6 +347,9 @@ bool Shows(const entt::registry& registry, Core::PlayerId viewer, entt::entity e
     const Map* map = MapOf(registry);
     if (Visible(map, viewer, x, y)) return true;
     if (!Explored(map, viewer, x, y)) return false;
+    // A tree planted since this tile was explored is unknown until actually seen.
+    if (const auto* planted = registry.try_get<Components::Planted>(subject);
+        planted != nullptr && (planted->seen & Bit(viewer)) == 0) return false;
     // In the fog, what the viewer keeps a picture of is the picture.
     if (const auto* remembered = registry.try_get<Components::Remembered>(subject);
         remembered != nullptr && viewer < 16 && (remembered->by & Bit(viewer)) != 0) {

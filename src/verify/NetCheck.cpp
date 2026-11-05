@@ -1,4 +1,4 @@
-#include "verify/Harness.h"
+﻿#include "verify/Harness.h"
 
 #include <chrono>
 #include <cstdio>
@@ -50,7 +50,7 @@ struct Machine {
         while (ran < ticks && Net::NextTick(session, due)) {
             for (const auto& c : due) ECS::Orders::Execute(sim.GetRegistry(), sim.GetGrid(), c);
             sim.Update(16);
-            Net::TickDone(session, sim.GetRegistry());
+            Net::TickDone(session, sim);
             ++ran;
         }
         return ran;
@@ -307,10 +307,9 @@ bool CheckNet() {
         if (ok() && host.session.turn < from + 20) verdict = "the game did not resume after a pause";
     }
 
-    // Tampering with one machine's world is noticed by both.
+    // A terrain-only difference must stop both machines before units diverge.
     if (ok()) {
-        client.sim.GetRegistry().get<ECS::Components::Transform>(theirs).position.y =
-            client.sim.GetRegistry().get<ECS::Components::Transform>(theirs).position.y + Core::Fixed32(1);
+        ++client.sim.GetGrid().GetTileMut(0, 0).elevation;
         for (int frame = 0; frame < 2000 && !(host.session.desynced && client.session.desynced); ++frame) {
             Net::Pump(host.session);
             Net::Pump(client.session);

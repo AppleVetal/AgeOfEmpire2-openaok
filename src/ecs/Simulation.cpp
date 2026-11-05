@@ -1,4 +1,4 @@
-#include "Simulation.h"
+﻿#include "Simulation.h"
 
 #include <algorithm>
 #include <iostream>
@@ -52,6 +52,7 @@
 #include "ecs/Navigation.h"
 #include "systems/MovementSystem.h"
 #include "systems/WorkerSystem.h"
+#include "ecs/WorldJobs.h"
 
 namespace ECS {
 
@@ -306,8 +307,10 @@ void Simulation::Update(int32_t dt_ms) {
     // Siege engines setting up or packing, and packed ones closing on a
     // target, before anything moves.
     { Core::Costs::Scope cost(Core::Costs::Part::Movement); Packing::Update(registry, grid, dt_ms); }
+    world_jobs::prepare(registry);
     { Core::Costs::Scope cost(Core::Costs::Part::Movement); Systems::MovementSystem::Update(registry, grid, dt_ms); }
     { Core::Costs::Scope cost(Core::Costs::Part::Workers); Systems::WorkerSystem::Update(registry, grid, dt_ms); }
+    world_jobs::update(registry, grid, dt_ms);
     { Core::Costs::Scope cost(Core::Costs::Part::Trade); Trade::Update(registry, grid, dt_ms); }
     { Core::Costs::Scope cost(Core::Costs::Part::Garrisons); Garrisons::Update(registry, grid, dt_ms); }
     { Core::Costs::Scope cost(Core::Costs::Part::Duties); Duties::Update(registry, grid, dt_ms); }
@@ -331,6 +334,7 @@ void Simulation::Update(int32_t dt_ms) {
     { Core::Costs::Scope cost(Core::Costs::Part::Vision); CalculateVision(); }
     // What each player stops seeing, it remembers as it was.
     { Core::Costs::Scope cost(Core::Costs::Part::Fog); Fog::Update(registry); }
+    world_jobs::observe(registry);
     // What of Gaia's the players now see, the first of them takes.
     { Core::Costs::Scope cost(Core::Costs::Part::Other); Allegiance::Capture(registry, grid); }
     // Last, after everything else that tick.

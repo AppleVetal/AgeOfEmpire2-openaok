@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // The headless self-check behind `--verify`, one translation unit per scenario.
 // Each scenario builds its own world from the same fixed seed, so the scenarios
@@ -15,6 +15,8 @@ class Simulation;
 }
 
 namespace Verify {
+bool CheckWorldJobs();
+bool CheckForestNetwork();
 
 // A digest of the world's state -- every entity's place, hit points, owner and
 // identity, in entity order. Two worlds that should be the same, and are not,
@@ -499,6 +501,8 @@ bool CheckScore();
 
 // Runs every scenario. Returns a process exit status: 0 when all passed.
 int Run(int ticks);
+
+bool CheckCompatibility();
 
 // A game saved part way through and loaded into a fresh world runs on as the
 // one that never stopped, and a damaged save is refused. Prints "save=".

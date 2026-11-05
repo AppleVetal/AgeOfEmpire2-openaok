@@ -1,4 +1,4 @@
-#include "save/Save.h"
+﻿#include "save/Save.h"
 
 #include <cstring>
 #include <fstream>
@@ -57,6 +57,7 @@
 #include "ecs/components/Transform.h"
 #include "ecs/components/Waypoints.h"
 #include "ecs/components/Worker.h"
+#include "ecs/components/WorldJob.h"
 #include "net/Wire.h"
 
 namespace Save {
@@ -69,7 +70,7 @@ namespace C = ECS::Components;
 
 constexpr char kMagic[8] = {'A', 'O', 'K', 'C', 'S', 'A', 'V', 'E'};
 // The save format's version; a save of any other version is refused.
-constexpr uint32_t kVersion = 11;
+constexpr uint32_t kVersion = 13;
 
 // Plain data goes out as it lies in memory.
 template <typename T>
@@ -105,6 +106,23 @@ void GetPods(Reader& r, std::vector<T>& values) {
 }
 
 // The components that hold vectors, field by field.
+void Put(Writer& w, const C::WorldJobQueue& queue) {
+    w.U16(queue.count);
+    for (uint16_t i = 0; i < queue.count; ++i) w.Entity(queue.sites[i]);
+}
+void Get(Reader& r, C::WorldJobQueue& queue) {
+    queue.count = r.U16();
+    if (queue.count > C::worldJobQueueLimit) { r.ok = false; queue.count = 0; return; }
+    for (uint16_t i = 0; i < queue.count; ++i) queue.sites[i] = r.Entity();
+}
+void Get(Reader& r, C::WorldJob& job) {
+    GetPod(r, job);
+    if (job.kind != Core::WorldJobKind::PlantTree ||
+        (job.phase != C::WorldJobPhase::Working && job.phase != C::WorldJobPhase::Growing) ||
+        job.workMs < 16 || job.workMs > 3600000 || job.workedMs.value < 0 ||
+        job.workedMs > Core::Fixed32(job.workMs) || job.paidWood < 0 || job.paidWood > 10000 ||
+        job.growthLeftMs < 0 || job.growthLeftMs > 3600000) r.ok = false;
+}
 void Put(Writer& w, const C::Path& p) {
     PutPods(w, p.waypoints);
     w.U64(p.current_waypoint_index);
@@ -233,6 +251,9 @@ void EachComponent(F&& f) {
     f.template operator()<C::Transforming>("Transforming");
     f.template operator()<C::Waypoints>("Waypoints");
     f.template operator()<C::Worker>("Worker");
+    f.template operator()<C::WorldJob>("WorldJob");
+    f.template operator()<C::WorldJobQueue>("WorldJobQueue");
+    f.template operator()<C::Planted>("Planted");
 }
 
 // The sizes of everything written raw: a build that lays them out
@@ -607,6 +628,7 @@ bool Write(const ECS::Simulation& sim, std::vector<uint8_t>& out) {
     w.bytes.insert(w.bytes.end(), std::begin(kMagic), std::end(kMagic));
     w.U32(kVersion);
     w.U64(Fingerprint());
+    Net::Wire::Write(w, Core::content::current());
     Net::Wire::Write(w, sim.Setup());
     w.U64(sim.Tick());
     w.U32(static_cast<uint32_t>(sim.player_starts.size()));
@@ -688,7 +710,7 @@ bool Write(const ECS::Simulation& sim, std::vector<uint8_t>& out) {
     PutPods(w, sim.GetGrid().Tiles());
 
     // What the world must come back as.
-    w.U64(ECS::Digest::Of(registry));
+    w.U64(ECS::Digest::Of(sim));
     out = std::move(w.bytes);
     return true;
 }
@@ -698,6 +720,8 @@ bool ReadSetup(const std::vector<uint8_t>& in, Core::GameSetup& setup) {
     if (in.size() < sizeof(kMagic) || std::memcmp(in.data(), kMagic, sizeof(kMagic)) != 0) return false;
     r.at = sizeof(kMagic);
     if (r.U32() != kVersion || r.U64() != Fingerprint()) return false;
+    Core::content::Identity identity;
+    if (!Net::Wire::Read(r, identity) || identity != Core::content::current()) return false;
     return Net::Wire::Read(r, setup) && r.ok;
 }
 
@@ -711,6 +735,12 @@ bool Read(ECS::Simulation& sim, const std::vector<uint8_t>& in, std::string* err
     if (r.U32() != kVersion || r.U64() != Fingerprint()) {
         Fail(error, "saved by a different build");
         return false;
+    }
+    Core::content::Identity identity;
+    if (!Net::Wire::Read(r, identity) || identity != Core::content::current())
+    {
+      Fail(error, "saved with different engine or game data");
+      return false;
     }
     Core::GameSetup setup;
     if (!Net::Wire::Read(r, setup)) {
@@ -831,7 +861,7 @@ bool Read(ECS::Simulation& sim, const std::vector<uint8_t>& in, std::string* err
     sim.ReplaceRegistry(std::move(registry));
     sim.RestoreTick(tick);
     sim.player_starts = std::move(starts);
-    if (ECS::Digest::Of(sim.GetRegistry()) != digest) {
+    if (ECS::Digest::Of(sim) != digest) {
         Fail(error, "the restored world is not the one saved");
         return false;
     }

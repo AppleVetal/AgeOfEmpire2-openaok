@@ -1,7 +1,9 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 
 #include <entt/entt.hpp>
+
+namespace ECS { class Simulation; }
 
 // A digest of the world: every entity's identity, place, hit points and owner,
 // in entity order, then each player's four stockpiles, the Market's prices and
@@ -12,5 +14,8 @@
 namespace ECS::Digest {
 
 uint64_t Of(const entt::registry& registry);
+
+// Includes terrain, resource nodes, the simulation clock and its random stream.
+uint64_t Of(const Simulation& simulation);
 
 } // namespace ECS::Digest

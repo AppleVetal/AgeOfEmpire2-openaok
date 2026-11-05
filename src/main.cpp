@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <algorithm>
 #include <chrono>
 #include <memory>
@@ -16,6 +16,8 @@
 #include "ecs/components/Owner.h"
 #include "ecs/components/Worker.h"
 #include "core/Command.h"
+#include "core/ContentIdentity.h"
+#include "core/Worldcraft.h"
 #include "core/CommandQueue.h"
 #include "verify/AIGame.h"
 #include "verify/Harness.h"
@@ -189,6 +191,17 @@ struct Launch {
 };
 
 bool LoadData() {
+    std::string contentError;
+    if (!Core::worldcraft::load("../mods/worldcraft", contentError))
+    {
+      std::cerr << "[Worldcraft] " << contentError << std::endl;
+      return false;
+    }
+    if (!Core::content::load("../assets", contentError))
+    {
+      std::cerr << "[Content] " << contentError << std::endl;
+      return false;
+    }
     if (!Core::ConfigManager::Get().LoadExtractedData("../assets/extracted_data/units.json", "../assets/extracted_data/graphics.json")) {
         std::cerr << "[App] Failed to load unit definitions." << std::endl;
         return false;
@@ -224,6 +237,11 @@ bool LoadData() {
     // The game's text, by string id.
     Core::Strings::Load("../assets/extracted_data/strings.json");
     Core::Hotkeys::Load("../assets/extracted_data/hotkeys.json");
+    if (!Core::worldcraft::validateArt(contentError))
+    {
+      std::cerr << "[Worldcraft] " << contentError << std::endl;
+      return false;
+    }
     // The random map scripts and AI. Opened before the simulation, whose map
     // generation runs a script, and before the window, since --verify
     // generates a map without one.
@@ -1486,7 +1504,7 @@ GameEnd RunGame(HAL::Window& window, Rendering::Renderer& renderer, Core::GameSe
                 if (recording_on) Save::TakeTurn(recording, sim->Tick() + 1);
                 sim->Update(kTickMs);
                 if (recording_on) Save::Witness(recording, *sim);
-                Net::TickDone(session, sim->GetRegistry());
+                Net::TickDone(session, *sim);
                 accumulator -= kTick;
             }
             renderer.banner = session.desynced ? Core::Strings::Get(Core::Strings::Id::OutOfSync)

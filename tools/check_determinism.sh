@@ -1156,4 +1156,19 @@ else
     STATUS=1
 fi
 
+COMPATIBILITY=$(echo "$OUTPUT" | grep '^compatibility=')
+if [ "$COMPATIBILITY" = "compatibility=ok" ]; then
+    echo "compatibility OK"
+else
+    echo "CONTENT COMPATIBILITY FAILED: $COMPATIBILITY" >&2
+    STATUS=1
+fi
+
+WORLDJOBS=$(echo "$OUTPUT" | grep '^worldjobs=')
+FORESTNET=$(echo "$OUTPUT" | grep '^forestnet=')
+if [ "$WORLDJOBS" != "worldjobs=ok" ] || [ "$FORESTNET" != "forestnet=ok" ]; then
+    echo "WORLD JOBS FAILED: $WORLDJOBS; $FORESTNET" >&2
+    STATUS=1
+fi
+
 exit $STATUS

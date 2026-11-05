@@ -1,5 +1,6 @@
-#include "WorkerSystem.h"
+﻿#include "WorkerSystem.h"
 #include "ecs/components/Worker.h"
+#include "ecs/components/WorldJob.h"
 #include "ecs/components/Resource.h"
 #include "ecs/components/Transform.h"
 #include "ecs/components/Path.h"
@@ -71,6 +72,7 @@ constexpr int kMaxBuildAttempts = 40;
 entt::entity ActiveTarget(const Components::Worker& worker) {
     switch (worker.state) {
     case Core::UnitState::Building:  return worker.target_building;
+    case Core::UnitState::WorldJob:  return worker.target_building;
     case Core::UnitState::Repairing: return worker.target_building;
     case Core::UnitState::Returning: return worker.target_dropoff;
     default:                         return worker.target_resource;
@@ -179,7 +181,11 @@ Approach ApproachGround(entt::registry& registry, const Physics::Grid& grid,
     const ECS::Buildings::Bounds reach{ground.min_x - radius, ground.min_y - radius,
                                        ground.max_x + radius, ground.max_y + radius};
     const Core::Fixed32 gap = reach.DistanceFrom(transform.position);
-    const bool within = gap <= range + kArriveSlack;
+    // Queued planting tiles stay walkable. A worker arriving from the previous
+    // tile must step outside the next one's footprint before it can be blocked.
+    const bool besidePlanting = worker.state != Core::UnitState::WorldJob ||
+        ground.DistanceFrom(transform.position) >= radius;
+    const bool within = gap <= range + kArriveSlack && besidePlanting;
     const Core::Fixed32 spacing = (radius + radius) * kCrewSpacing;
 
     // What the rest of the crew on this same job has taken: where those already
@@ -282,7 +288,7 @@ Approach ApproachGround(entt::registry& registry, const Physics::Grid& grid,
 
     // Stepping aside from a crew mate, already within reach: a walk to the
     // spot itself, which a walk to the job would end before it began.
-    auto path = within ? Navigation::Route(registry, grid, self, transform.position, plan.spot,
+    auto path = (within || !besidePlanting) ? Navigation::Route(registry, grid, self, transform.position, plan.spot,
                                            entt::null, Core::Fixed32(0))
                        : Navigation::Route(registry, grid, self, transform.position, plan.spot,
                                            target_entity, range);
@@ -701,12 +707,14 @@ void WorkerSystem::Update(entt::registry& registry, Physics::Grid& grid, int32_t
         // so the flag is cleared here. Only the states that actually do a job
         // keep it; walking to one or carrying a load home does not.
         const bool on_a_job = worker.state == Core::UnitState::Building ||
+                              worker.state == Core::UnitState::WorldJob ||
                               worker.state == Core::UnitState::Gathering ||
                               worker.state == Core::UnitState::Repairing;
         if (!on_a_job) {
             worker.working = false;
         }
         if (worker.state != Core::UnitState::Building &&
+            worker.state != Core::UnitState::WorldJob &&
             worker.state != Core::UnitState::Repairing) {
             worker.target_building = entt::null;
             worker.build_attempts = 0;
@@ -1087,6 +1095,39 @@ void WorkerSystem::Update(entt::registry& registry, Physics::Grid& grid, int32_t
                 break;
             }
             
+            case Core::UnitState::WorldJob: {
+                worker.working = false;
+                const auto target = worker.target_building;
+                if (!registry.valid(target) || !registry.all_of<Components::WorldJob, Components::Transform>(target)) break;
+                const auto& site = registry.get<Components::Transform>(target).position;
+                const auto ground = ECS::Buildings::TileBounds(site);
+                switch (ApproachGround(registry, grid, entity, worker, transform, target, ground, kDefaultWorkRange)) {
+                case Approach::Arrived:
+                    worker.working = true;
+                    worker.build_attempts = 0;
+                    registry.remove<Components::Path>(entity);
+                    if (auto* look = registry.try_get<Components::Sprite>(entity)) {
+                        look->heading = Core::FixedMath::WorldVectorToHeading(
+                            site.x - transform.position.x, site.y - transform.position.y);
+                    }
+                    break;
+                case Approach::Unreachable:
+                    if (++worker.build_attempts > kMaxBuildAttempts) {
+                        if (auto* queue = registry.try_get<Components::WorldJobQueue>(entity); queue && queue->count > 0) {
+                            std::move(queue->sites.begin() + 1, queue->sites.begin() + queue->count, queue->sites.begin());
+                            --queue->count;
+                        }
+                        registry.remove<Components::Path>(entity);
+                        worker.target_building = entt::null;
+                        worker.build_attempts = 0;
+                    }
+                    break;
+                case Approach::Walking:
+                case Approach::Waiting:
+                    break;
+                }
+                break;
+            }
             case Core::UnitState::Building: {
                 auto stop_building = [&worker]() {
                     worker.target_building = entt::null;

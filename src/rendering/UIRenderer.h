@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <SDL2/SDL.h>
 #include <string>
 #include "core/Types.h"
@@ -113,6 +113,8 @@ public:
         CancelOrder,  // the order waiting for its target, or the building being placed, given up
         BackToWork,   // the villagers inside the selected building sent back to work
         Caption,      // words in a slot, not a button: the Market's "Sell:"
+        PlantTree,
+        CancelPlanting,
     };
     struct Command {
         CommandKind kind = CommandKind::Produce;
@@ -157,7 +159,7 @@ public:
                         SetStance, Stop, Ungarrison, TownBell, Patrol, Guard, Follow,
                         Garrison, Repair, Sell, Buy, LockGate, Pack, Treason, Convert,
                         Heal, Unload, GatherPoint, RemoveGatherPoint, CancelOrder,
-                        BackToWork, Form, Disband };
+                        BackToWork, Form, Disband, PlantTree, CancelPlanting };
 
     // The formation the player last chose; a group move marches in it.
     static Core::Formation CurrentFormation();

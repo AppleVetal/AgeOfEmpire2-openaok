@@ -1,4 +1,4 @@
-#include "verify/Harness.h"
+﻿#include "verify/Harness.h"
 
 #include <cstdio>
 #include <cstring>
@@ -36,10 +36,10 @@ int Armour(const Core::Rules::UnitRules* rules) {
         ? Core::Rules::ClassValue(rules->armours, rules->armour_count, kPierceClass, 0) : -1;
 }
 
-int TechNamed(const char* label) {
+int TechNamed(const char* name) {
     const auto& techs = Core::Rules::Get().techs;
     for (int id = 0; id < static_cast<int>(techs.size()); ++id) {
-        if (techs[id].valid && Core::Rules::TechLabel(id) == label) return id;
+        if (techs[id].valid && Core::Rules::Get().tech_text[id].name == name) return id;
     }
     return -1;
 }
@@ -60,7 +60,7 @@ bool CheckConversion() {
     const int militia = cfg.GetUnitIdByName("SPRMN");
     const int forging = TechNamed("Forging");
     const int scale_mail = TechNamed("Scale Mail Armor");
-    const int man_at_arms = TechNamed("Man-at-Arms");
+    const int man_at_arms = TechNamed("Man-At-Arms");
     if (forging < 0 || scale_mail < 0 || man_at_arms < 0) verdict = "the dat has no Forging, Scale Mail or Man-at-Arms";
 
     Core::GameSetup setup = Core::DefaultSetup();

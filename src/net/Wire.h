@@ -1,9 +1,10 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "core/Command.h"
+#include "core/ContentIdentity.h"
 #include "core/GameSetup.h"
 
 // The bytes a network game sends: commands, the lobby's setup, and the frame
@@ -46,5 +47,8 @@ bool Read(Reader& in, Core::Command& command);
 
 void Write(Writer& out, const Core::GameSetup& setup);
 bool Read(Reader& in, Core::GameSetup& setup);
+
+void Write(Writer& out, const Core::content::Identity& identity);
+bool Read(Reader& in, Core::content::Identity& identity);
 
 } // namespace Net::Wire

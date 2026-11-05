@@ -1,7 +1,8 @@
-#pragma once
+﻿#pragma once
 #include <SDL2/SDL.h>
 #include <algorithm>
 #include <cstdlib>
+#include "core/Command.h"
 #include "ecs/Simulation.h"
 #include "rendering/UIRenderer.h"
 
@@ -66,6 +67,14 @@ public:
         return true;
     }
 
+    bool planting(int& fromX, int& fromY, Core::PlantShape& shape) const
+    {
+        if (pending_order != PendingOrder::PlantTree) return false;
+        shape = plantShape;
+        if (isPlantDrag) { fromX = plantFromX; fromY = plantFromY; }
+        return true;
+    }
+
     // What an order would do to what is under the cursor, which picks the
     // cursor: a sword over an enemy, an axe over a tree.
     enum class Intent : uint8_t {
@@ -127,13 +136,17 @@ private:
     // A wall is placed by a drag: pressed on its first tile, released on its
     // last, and laid along the line between by one order.
     bool wall_drag = false;
+    bool isPlantDrag = false;
+    int plantFromX = 0;
+    int plantFromY = 0;
+    Core::PlantShape plantShape = Core::PlantShape::Line;
     int wall_from_x = 0;
     int wall_from_y = 0;
 
     // A standing order waiting for its target: the next click in the world
     // names the point to patrol to, or the unit to guard or follow.
     enum class PendingOrder : uint8_t { None, Patrol, Guard, Follow, Garrison, Repair, Flare,
-                                        Convert, Heal, Unload, GatherPoint };
+                                        Convert, Heal, Unload, GatherPoint, PlantTree };
     PendingOrder pending_order = PendingOrder::None;
     // Gives the pending order at world point (x, y) to the player's selected
     // units, and clears it.

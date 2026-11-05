@@ -1,9 +1,11 @@
-#include "verify/Harness.h"
+﻿#include "verify/Harness.h"
 
 #include <cstdio>
 #include <string>
 
 #include "core/ConfigManager.h"
+#include "core/Hotkeys.h"
+#include "core/Strings.h"
 #include "ecs/ScenarioWorld.h"
 #include "ecs/Simulation.h"
 #include "ecs/components/Selectable.h"
@@ -19,6 +21,24 @@ constexpr int kHouse = 70;
 
 bool EndsWith(const std::string& text, const std::string& end) {
     return text.size() >= end.size() && text.compare(text.size() - end.size(), end.size(), end) == 0;
+}
+
+// Проверяет локализованный шаблон подсказки и фактическую привязку кнопки.
+bool hasHotkey(const UI::Command& command, int group, int item, SDL_Keycode key)
+{
+  SDL_KeyboardEvent event{};
+  event.keysym.sym = key;
+  return command.hotkey_group == group && command.hotkey_item == item &&
+    Core::Hotkeys::Is(event, command.hotkey_group, command.hotkey_item);
+}
+
+std::string hotkeySuffix(const char* letter)
+{
+  auto text = Core::Strings::Get(19732);
+  const auto at = text.find("%s");
+  if (at == std::string::npos) return {};
+  text.replace(at, 2, letter);
+  return text;
 }
 
 } // namespace
@@ -58,9 +78,30 @@ bool CheckHelp() {
         });
         if (buildings.empty() || house.empty()) {
             verdict = "no help for the Buildings or the House button";
-        } else if (!EndsWith(buildings, "(Hotkey: B)") || !EndsWith(house, "(Hotkey: E)")) {
+        } else if (hotkeySuffix("B").empty() || hotkeySuffix("E").empty() ||
+                   !EndsWith(buildings, hotkeySuffix("B")) || !EndsWith(house, hotkeySuffix("E"))) {
             verdict = "a button's help does not end with its hotkey";
         }
+    }
+    if (verdict == nullptr)
+    {
+      const auto townCenter = cfg.GetUnitIdByName("RTWC");
+      const auto building = ECS::ScenarioWorld::Place(reg, sim.GetGrid(), townCenter, 1,
+        {Core::Fixed32(sx + 15), Core::Fixed32(sy + 15)}, {}, 0);
+      if (building == entt::null) verdict = "no Town Center placed";
+      else
+      {
+        for (auto entity : reg.view<ECS::Components::Selectable>())
+          reg.get<ECS::Components::Selectable>(entity).is_selected = entity == building;
+        UI::Command commands[UI::kCommandSlots];
+        const auto count = UI::BuildCommands(sim, 1024, 768, commands, UI::kCommandSlots);
+        bool hasVillagerKey = false;
+        for (int i = 0; i < count; ++i)
+          if (commands[i].kind == UI::CommandKind::Produce && commands[i].unit_id == 83)
+            hasVillagerKey = hasHotkey(commands[i], Core::Hotkeys::kTownCenter,
+              Core::Hotkeys::kVillager, SDLK_c);
+        if (!hasVillagerKey) verdict = "the Town Center cannot train a villager by hotkey";
+      }
     }
     std::printf("help=%s\n", verdict == nullptr ? "ok" : verdict);
     return verdict == nullptr;

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <string_view>
 
@@ -230,7 +230,7 @@ int FindThing(std::string_view name);
 
 // The dat's name a symbol's unit or technology must carry, which `Check`
 // compares against.
-std::string_view ExpectedLabel(int thing);
+std::string_view ExpectedDatName(int thing);
 
 // Simple enumerations: each word's value.
 bool FindAge(std::string_view name, int& out);               // dark-age 0 .. post-imperial-age 4

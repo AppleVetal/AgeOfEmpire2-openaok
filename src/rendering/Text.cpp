@@ -1,4 +1,4 @@
-#include "Text.h"
+﻿#include "Text.h"
 
 #include "core/Strings.h"
 
@@ -26,9 +26,9 @@ bool VdmxMetrics(FT_Face face, int ppem, int& ascent, int& descent);
 // GDI's MulDiv(points, 96, 72): rounds half away from zero.
 int PixelsForPoints(int points) { return (points * 96 + 36) / 72; }
 
-// One face file per family and style. The CD ships every family the table
-// names but Arial; a family missing a style is emboldened or slanted the way
-// GDI would simulate it.
+// One face file per family and style named by the game's language table.
+// A family missing a style is emboldened or slanted the way GDI would
+// simulate it.
 struct FaceFile {
     const char* family;
     const char* regular;
@@ -37,6 +37,7 @@ struct FaceFile {
     const char* bold_italic;
 };
 constexpr FaceFile kFaceFiles[] = {
+  {"Times New Roman", "TIMES.TTF", "TIMESBD.TTF", "TIMESI.TTF", "TIMESBI.TTF"},
     {"Georgia", "GEORGIA.TTF", "GEORGIAB.TTF", "GEORGIAI.TTF", "GEORGIAZ.TTF"},
     {"Lucida Blackletter", "LBLACK.TTF", nullptr, nullptr, nullptr},
     {"Lucida Bright", "LBRITE.TTF", "LBRITED.TTF", "LBRITEI.TTF", "LBRITEDI.TTF"},

@@ -1,4 +1,4 @@
-#include "net/Lockstep.h"
+﻿#include "net/Lockstep.h"
 
 #include <algorithm>
 
@@ -22,6 +22,7 @@ constexpr uint32_t kNoDigest = 0xFFFFFFFFu;
 std::vector<uint8_t> Welcome(const Session& session, Core::PlayerId seat) {
     Wire::Writer out;
     out.U8(kWelcome);
+    Wire::Write(out, session.content);
     out.U8(seat);
     Wire::Write(out, session.setup);
     out.U32(static_cast<uint32_t>(session.restore.size()));
@@ -81,6 +82,13 @@ void Arrived(Session& session, const std::vector<uint8_t>& message, Peer* from) 
     Wire::Reader in(message);
     const uint8_t kind = in.U8();
     if (kind == kWelcome && session.role == Role::Client) {
+        Core::content::Identity identity;
+        if (!Wire::Read(in, identity) || identity != session.content)
+        {
+          session.refused = kWrongVersion;
+          session.failure = "the host uses different engine or game data";
+          return;
+        }
         session.seat = in.U8();
         Core::GameSetup setup;
         if (!Wire::Read(in, setup)) {
@@ -105,6 +113,7 @@ void Arrived(Session& session, const std::vector<uint8_t>& message, Peer* from) 
         return;
     }
     if (kind == kStart && session.role == Role::Client) {
+        if (!session.welcomed || session.refused != 0 || !session.failure.empty()) return;
         Begin(session);
         return;
     }
@@ -201,6 +210,7 @@ void Pump(Session& session) {
         Wire::Writer hello;
         hello.U8('H');
         hello.U8(kVersion);
+        Wire::Write(hello, session.content);
         hello.Text(session.name);
         HAL::Net::Send(session.peers[0].connection, hello.bytes);
     }
@@ -223,10 +233,13 @@ void Pump(Session& session) {
             Wire::Reader in(hello);
             const bool greeting = in.U8() == kHello;
             const uint8_t version = in.U8();
+            Core::content::Identity identity;
+            const bool hasMatchingContent = version == kVersion &&
+              Wire::Read(in, identity) && identity == session.content;
             const Core::PlayerId seat = session.humans.size() > session.peers.size() + 1
                 ? session.humans[session.peers.size() + 1] : 0;
-            if (!in.ok || !greeting || version != kVersion || seat == 0) {
-                if (in.ok && greeting && version != kVersion) {
+            if (!in.ok || !greeting || !hasMatchingContent || seat == 0) {
+                if (greeting && !hasMatchingContent) {
                     Wire::Writer out;
                     out.U8(kEject);
                     out.U16(static_cast<uint16_t>(kWrongVersion));
@@ -324,10 +337,10 @@ bool NextTick(Session& session, std::vector<Core::Command>& due) {
     return true;
 }
 
-void TickDone(Session& session, const entt::registry& registry) {
+void TickDone(Session& session, const ECS::Simulation& simulation) {
     if (++session.tick_in_turn < kTicksPerTurn) return;
     session.tick_in_turn = 0;
-    session.digests[session.turn][session.seat] = ECS::Digest::Of(registry);
+    session.digests[session.turn][session.seat] = ECS::Digest::Of(simulation);
     Compare(session, session.turn);
     // Old digests are of no more use once compared.
     if (session.turn > 64) session.digests.erase(session.digests.begin(),
@@ -337,7 +350,9 @@ void TickDone(Session& session, const entt::registry& registry) {
 
 void Leave(Session& session) {
     for (Peer& peer : session.peers) HAL::Net::Close(peer.connection);
+    for (Peer& peer : session.arriving) HAL::Net::Close(peer.connection);
     if (session.listener != HAL::Net::kNoSocket) HAL::Net::CloseListener(session.listener);
+    if (session.beacon != HAL::Net::kNoSocket) HAL::Net::CloseDatagram(session.beacon);
     session = Session{};
 }
 

@@ -1,4 +1,4 @@
-#include "ecs/VillagerJobs.h"
+﻿#include "ecs/VillagerJobs.h"
 
 #include "core/ConfigManager.h"
 #include "core/Rules.h"
@@ -26,6 +26,7 @@ const char* JobCode(Components::VillagerJob job) {
 Components::VillagerJob JobFor(const Components::Worker& worker) {
     switch (worker.state) {
     case Core::UnitState::Building:
+    case Core::UnitState::WorldJob:
         return Components::VillagerJob::Build;
     case Core::UnitState::Repairing:
         return Components::VillagerJob::Repair;

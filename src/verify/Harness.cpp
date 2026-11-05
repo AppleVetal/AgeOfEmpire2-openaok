@@ -1,4 +1,4 @@
-#include "verify/Harness.h"
+﻿#include "verify/Harness.h"
 
 #include <cstdlib>
 #include <string>
@@ -24,6 +24,9 @@ int Run(int ticks) {
         return wanted.empty() || wanted.find("," + std::string(name) + ",") != std::string::npos;
     };
     bool ok = true;
+    if (runs("worldjobs")) ok &= CheckWorldJobs();
+    if (runs("forestnet")) ok &= CheckForestNetwork();
+    if (runs("compatibility")) ok &= CheckCompatibility();
     if (runs("entities")) ok &= CheckDeterminism(ticks);
     if (runs("gathering")) ok &= CheckGathering();
     if (runs("dropoff")) ok &= CheckDropoff();
