@@ -1102,7 +1102,7 @@ void WorkerSystem::Update(entt::registry& registry, Physics::Grid& grid, int32_t
                 if (!registry.valid(target) || !registry.all_of<Components::WorldJob, Components::Transform>(target)) break;
                 const auto& site = registry.get<Components::Transform>(target).position;
                 const auto& job = registry.get<Components::WorldJob>(target);
-                const auto ground = Core::isEarthwork(job.kind) ? earthworks::bounds(job.tileX, job.tileY) :
+                const auto ground = Core::isEarthwork(job.kind) ? earthworks::bounds(job.tileX, job.tileY, job.kind, job.rise) :
                     ECS::Buildings::TileBounds(site);
                 switch (ApproachGround(registry, grid, entity, worker, transform, target, ground, kDefaultWorkRange)) {
                 case Approach::Arrived:

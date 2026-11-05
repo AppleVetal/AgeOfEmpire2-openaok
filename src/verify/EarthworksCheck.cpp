@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include "core/CommandQueue.h"
+#include "core/ConfigManager.h"
+#include "core/IsometricMath.h"
 #include "core/Worldcraft.h"
 #include "ecs/Buildings.h"
 #include "ecs/Combat.h"
@@ -16,6 +18,12 @@
 #include "ecs/Simulation.h"
 #include "ecs/Vision.h"
 #include "ecs/WorldJobs.h"
+#include "ecs/Units.h"
+#include "ecs/components/Building.h"
+#include "ecs/components/Identity.h"
+#include "ecs/components/Resource.h"
+#include "ecs/components/Health.h"
+#include "ecs/components/Sprite.h"
 #include "ecs/components/Owner.h"
 #include "ecs/components/Selectable.h"
 #include "ecs/components/Worker.h"
@@ -78,6 +86,8 @@ namespace Verify
     const char* gridRules()
     {
       Physics::Grid slope(12, 12);
+      if (ECS::earthworks::targetLevel(slope.GetTile(6, 6), WorldJobKind::RaiseGround, 12) != 12)
+        return "a tower-height mountain is capped at a small hill";
       if (!slope.SetEarthwork(6, 6, 1, Physics::Earthwork::Raised) || !slope.IsWalkable(6, 6))
         return "a gentle slope is not walkable";
       const auto revision = slope.WalkRevision();
@@ -114,14 +124,18 @@ namespace Verify
       int x = 0, y = 0;
       if (!patch(sim, x, y)) return "no clear earthwork patch";
       for (const auto unit : registry.view<c::Selectable>()) registry.get<c::Selectable>(unit).is_selected = unit == crew.front();
-      Rendering::UIRenderer::OpenBuildMenu(sim, 0);
+      Rendering::UIRenderer::OpenBuildMenu(sim, Rendering::UIRenderer::earthworkPage);
       Rendering::UIRenderer::Command buttons[Rendering::UIRenderer::kCommandSlots];
       const int count = Rendering::UIRenderer::BuildCommands(sim, 1024, 768, buttons, Rendering::UIRenderer::kCommandSlots);
       int terrainButtons = 0;
       for (int i = 0; i < count; ++i)
         if (buttons[i].kind == Rendering::UIRenderer::CommandKind::Earthwork &&
             !Rendering::UIRenderer::CommandHelp(sim, buttons[i]).empty()) ++terrainButtons;
-      if (terrainButtons != 6) return "a villager is missing earthwork line or area controls";
+      if (terrainButtons != 10) return "a villager is missing earthwork line or area controls";
+      int heightButtons = 0;
+      for (int i = 0; i < count; ++i)
+        if (buttons[i].kind == Rendering::UIRenderer::CommandKind::EarthworkHeight && Core::isMountainHeight(buttons[i].height)) ++heightButtons;
+      if (heightButtons != 3) return "the three mountain heights are missing";
       auto& seat = *ECS::Players::Find(registry, 1);
       const int before = ECS::Players::Stock(seat, Core::ResourceType::Wood);
       Core::WorldJobCommand command{crew, WorldJobKind::RaiseGround, x, y, false, 2};
@@ -157,9 +171,11 @@ namespace Verify
       for (int tick = 0; tick < 4000 && !registry.view<c::WorldJob>().empty(); ++tick) sim.Update(16);
       if (!grid.IsWalkable(x, y) || grid.GetTile(x, y).elevation != originalLevel ||
           grid.GetTile(x, y).earthwork != Physics::Earthwork::None) return "villagers did not restore the original ground";
-      for (const auto kind : {WorldJobKind::RaiseGround, WorldJobKind::DigDitch, WorldJobKind::RestoreGround})
+      for (const auto kind : {WorldJobKind::RaiseGround, WorldJobKind::DigDitch, WorldJobKind::RestoreGround,
+          WorldJobKind::DigChannel, WorldJobKind::DigLake})
+      for (const int height : {Core::hillHeight, Core::mountainHeight, Core::highMountainHeight})
       {
-        const Core::Command packet = Core::PlantLayoutCommand{crew, x, y, x + 2, y + 2, Core::PlantShape::Area, true, 1, kind};
+        const Core::Command packet = Core::PlantLayoutCommand{crew, x, y, x + 2, y + 2, Core::PlantShape::Area, true, 1, kind, height};
         Net::Wire::Writer bytes, round;
         Net::Wire::Write(bytes, packet);
         Net::Wire::Reader reader(bytes.bytes);
@@ -170,6 +186,37 @@ namespace Verify
         bytes.bytes.pop_back();
         Net::Wire::Reader shortReader(bytes.bytes);
         if (Net::Wire::Read(shortReader, decoded)) return "a truncated earthwork command was accepted";
+      }
+      return nullptr;
+    }
+
+    const char* heights()
+    {
+      for (const int height : {Core::hillHeight, Core::mountainHeight, Core::highMountainHeight})
+      {
+        ECS::Simulation sim, restored;
+        sim.Init(setup());
+        auto& registry = sim.GetRegistry();
+        auto& grid = sim.GetGrid();
+        // A separate open site makes the height independent of pinned building corners.
+        const int x = 20, y = 20;
+        const auto before = Rendering::Ground::HeightPx(grid, x, y);
+        Core::WorldJobCommand command{workers(sim), WorldJobKind::RaiseGround, x, y, false, 1, height};
+        if (!ECS::world_jobs::order(registry, grid, command)) return "a selectable mountain height cannot be ordered";
+        const int target = registry.get<c::WorldJob>(registry.view<c::WorldJob>().front()).targetElevation;
+        const auto site = registry.view<c::WorldJob>().front();
+        if (!ECS::earthworks::finish(registry, grid, site)) return "a selectable mountain height cannot finish";
+        registry.destroy(site);
+        if (grid.GetTile(x, y).elevation != target || Rendering::Ground::HeightPx(grid, x, y) - before < height * 8)
+          return "a selectable mountain height is too low";
+        std::vector<uint8_t> bytes;
+        if (!Save::Write(sim, bytes) || !Save::Read(restored, bytes) || ECS::Digest::Of(sim) != ECS::Digest::Of(restored))
+          return "a completed mountain changed after loading";
+        if (const auto* artifacts = std::getenv("AOE_EARTHWORK_ARTIFACTS"))
+        {
+          const auto name = "height-" + std::to_string(height) + ".sav";
+          if (!Save::WriteFile(sim, (std::filesystem::path(artifacts) / name).string())) return "cannot save a mountain capture";
+        }
       }
       return nullptr;
     }
@@ -189,12 +236,12 @@ namespace Verify
       auto& queue = Core::CommandQueue::Get();
       queue.PopAllCommands();
       bool hasRestore = false;
-      constexpr int ticks = 14000;
+      constexpr int ticks = 40000;
       const auto* artifacts = std::getenv("AOE_EARTHWORK_ARTIFACTS");
       for (int tick = 0; tick < ticks; ++tick)
       {
         if (tick == 20) queue.PushCommand(Core::PlantLayoutCommand{crew, x, y, x + 2, y + 2,
-          Core::PlantShape::Area, false, 1, WorldJobKind::RaiseGround});
+          Core::PlantShape::Area, false, 1, WorldJobKind::RaiseGround, Core::hillHeight});
         Save::TakeTurn(recording, sim.Tick() + 1);
         sim.Update(16);
         Save::Witness(recording, sim);
@@ -221,7 +268,7 @@ namespace Verify
         for (int col = 0; col < 3; ++col)
         {
           const auto& tile = sim.GetGrid().GetTile(x + col, y + row);
-          const int expected = initial[row * 3 + col] + (row == 1 && col == 1 ? 2 : 1);
+          const int expected = initial[row * 3 + col] + Core::hillHeight;
           if (tile.elevation != expected || tile.earthwork != Physics::Earthwork::Raised)
           {
             std::printf("  unfinished mountain: tile=%d,%d level=%d expected=%d jobs=%zu\n",
@@ -254,6 +301,166 @@ namespace Verify
       ++changed.originalElevation;
       if (ECS::Digest::Of(sim) == digest) return "the restoration height escaped the digest";
       --changed.originalElevation;
+      return nullptr;
+    }
+
+    const char* freedom()
+    {
+      ECS::Simulation sim;
+      sim.Init(setup());
+      auto& registry = sim.GetRegistry();
+      auto& grid = sim.GetGrid();
+      const auto crew = workers(sim);
+      int x = 0, y = 0;
+      if (!patch(sim, x, y)) return "no site for displacement";
+      auto& person = registry.get<c::Transform>(crew.back());
+      person.position = {Fixed32(x), Fixed32(y)};
+      person.previous_position = person.position;
+      const auto originalPerson = person.position;
+      const int hp = registry.get<c::Health>(crew.back()).current_hp;
+      std::vector<entt::entity> animals;
+      for (const char* name : {"HAWKX", "SHEEPG"})
+      {
+        const auto animal = ECS::Units::Spawn(registry, Core::ConfigManager::Get().GetUnitIdByName(name), 0, originalPerson);
+        if (animal == entt::null) return "test creature is missing from the game data";
+        animals.push_back(animal);
+      }
+      for (const auto entity : registry.view<const c::Health, const c::Owner, c::Transform>())
+        if (!registry.any_of<c::Worker, c::Building>(entity) && registry.get<c::Owner>(entity).player_id == 1)
+        {
+          registry.get<c::Transform>(entity).position = originalPerson;
+          animals.push_back(entity);
+          break;
+        }
+      if (animals.size() != 3) return "no horse for displacement";
+      std::vector<std::pair<int, Core::PlayerId>> animalState;
+      for (const auto animal : animals) animalState.emplace_back(registry.get<c::Health>(animal).current_hp, registry.get<c::Owner>(animal).player_id);
+      const auto tree = registry.create();
+      const c::Vector2D treeAt{Fixed32(x + 1), Fixed32(y)};
+      registry.emplace<c::Transform>(tree, treeAt, treeAt);
+      registry.emplace<c::Resource>(tree, Core::ResourceType::Wood, 77);
+      registry.emplace<c::Identity>(tree, Core::worldcraft::plantRules().treeUnit);
+      c::Sprite art;
+      art.slp_id = Core::ConfigManager::Get().GetUnitGraphicById(Core::worldcraft::plantRules().treeUnit, "idle_graphic0").slp_id;
+      registry.emplace<c::Sprite>(tree, art);
+      grid.GetTileMut(x + 1, y).has_tree = true;
+      grid.SetWalkable(x + 1, y, false);
+      const int beforeLevel = grid.GetTile(x, y).elevation;
+      Core::WorldJobCommand raise{crew, WorldJobKind::RaiseGround, x, y, false, 1, Core::mountainHeight};
+      if (!ECS::world_jobs::order(registry, grid, raise)) return "a person or tree still rejects the mountain order";
+      const auto site = registry.view<c::WorldJob>().front();
+      if (registry.get<c::Sprite>(site).slp_id != Core::worldcraft::workMarkerSlp(WorldJobKind::RaiseGround))
+        return "earthworks still use the tree stump";
+      if (!ECS::earthworks::finish(registry, grid, site)) return "a mountain could not clear its footprint";
+      registry.destroy(site);
+      const auto& moved = registry.get<c::Transform>(crew.back()).position;
+      for (std::size_t i = 0; i < animals.size(); ++i)
+      {
+        const auto animal = animals[i];
+        const auto& at = registry.get<c::Transform>(animal).position;
+        if ((at.x == originalPerson.x && at.y == originalPerson.y) || registry.get<c::Health>(animal).current_hp != animalState[i].first ||
+            registry.get<c::Owner>(animal).player_id != animalState[i].second) return "a horse, bird or animal was lost during displacement";
+      }
+      const auto& movedTree = registry.get<c::Transform>(tree).position;
+      if ((moved.x == originalPerson.x && moved.y == originalPerson.y) || registry.get<c::Health>(crew.back()).current_hp != hp ||
+          registry.get<c::Owner>(crew.back()).player_id != 1) return "displacement lost or harmed a villager";
+      if ((movedTree.x == treeAt.x && movedTree.y == treeAt.y) || registry.get<c::Resource>(tree).current_amount != 77 ||
+          !grid.GetTile(Physics::TileOf(movedTree.x), Physics::TileOf(movedTree.y)).has_tree) return "moving a tree lost its wood or blockage";
+      if (grid.GetTile(x, y).elevation != beforeLevel + Core::mountainHeight ||
+          Rendering::Ground::HeightPx(grid, static_cast<float>(x), static_cast<float>(y)) < 100.0f)
+        return "the completed mountain is still too low";
+      const auto projected = Core::IsometricMath::WorldToScreen(Fixed32(x), Fixed32(y));
+      const auto picked = Rendering::Ground::Pick(grid, projected.x,
+        projected.y - Rendering::Ground::HeightPx(grid, static_cast<float>(x), static_cast<float>(y)));
+      if (std::abs(picked.first - x) > 0.1f || std::abs(picked.second - y) > 0.1f) return "the mouse misses the tall mountain";
+      if (const auto* artifacts = std::getenv("AOE_EARTHWORK_ARTIFACTS"))
+      {
+        Save::WriteFile(sim, (std::filesystem::path(artifacts) / "tall-mountain.sav").string());
+        std::printf("  tall mountain centre=%d,%d\n", x, y);
+      }
+      return nullptr;
+    }
+
+    const char* noFreeSpace()
+    {
+      ECS::Simulation sim;
+      sim.Init(setup());
+      auto& registry = sim.GetRegistry();
+      auto& grid = sim.GetGrid();
+      const auto crew = workers(sim);
+      int x = 0, y = 0;
+      if (!patch(sim, x, y)) return "no site for the clearance test";
+      registry.get<c::Transform>(crew.front()).position = {Fixed32(x), Fixed32(y)};
+      if (!ECS::world_jobs::order(registry, grid, {crew, WorldJobKind::DigLake, x, y, false, 1})) return "occupied lake was rejected";
+      const auto site = registry.view<c::WorldJob>().front();
+      for (int row = 0; row < grid.GetHeight(); ++row)
+        for (int col = 0; col < grid.GetWidth(); ++col) grid.SetWalkable(col, row, false);
+      const auto before = ECS::Digest::Of(sim);
+      if (ECS::earthworks::finish(registry, grid, site) || ECS::Digest::Of(sim) != before)
+        return "failed clearance moved objects or changed ground partially";
+      return nullptr;
+    }
+
+    const char* shoreline()
+    {
+      ECS::Simulation sim;
+      sim.Init(setup());
+      auto& registry = sim.GetRegistry();
+      auto& grid = sim.GetGrid();
+      const auto crew = workers(sim);
+      int x = 0, y = 0;
+      if (!patch(sim, x, y)) return "no water work site";
+      grid.SetTerrain(x, y, Core::TerrainType::DeepWater);
+      Core::WorldJobCommand command{crew, WorldJobKind::DigChannel, x, y, false, 1};
+      if (!ECS::world_jobs::order(registry, grid, command)) return "water still rejects dry excavation";
+      auto site = registry.view<c::WorldJob>().front();
+      if (!ECS::earthworks::finish(registry, grid, site)) return "water could not be filled with sand";
+      registry.destroy(site);
+      if (grid.GetTile(x, y).terrain != Core::TerrainType::Sand || !grid.IsWalkable(x, y)) return "a shallow channel is not passable sand";
+      grid.SetEarthwork(x, y, -2, Physics::Earthwork::Channel);
+      command.kind = WorldJobKind::DigLake;
+      if (!ECS::world_jobs::order(registry, grid, command)) return "the lake order was rejected";
+      site = registry.view<c::WorldJob>().front();
+      if (!ECS::earthworks::finish(registry, grid, site)) return "the lake did not finish";
+      registry.destroy(site);
+      if (grid.GetTile(x, y).earthwork != Physics::Earthwork::Lake || grid.IsWalkable(x, y) ||
+          grid.GetTile(x, y).terrain != Core::TerrainType::MediumWater) return "the lake has no water or blocks the wrong layer";
+      if (const auto* artifacts = std::getenv("AOE_EARTHWORK_ARTIFACTS"))
+        Save::WriteFile(sim, (std::filesystem::path(artifacts) / "lake.sav").string());
+      command.kind = WorldJobKind::RestoreGround;
+      if (!ECS::world_jobs::order(registry, grid, command)) return "a lake cannot be restored";
+      site = registry.view<c::WorldJob>().front();
+      if (!ECS::earthworks::finish(registry, grid, site) || grid.GetTile(x, y).terrain != Core::TerrainType::DeepWater)
+        return "restoration lost the original water";
+      registry.destroy(site);
+      return nullptr;
+    }
+
+    const char* buildingsStay()
+    {
+      ECS::Simulation sim;
+      sim.Init(setup());
+      auto& registry = sim.GetRegistry();
+      auto& grid = sim.GetGrid();
+      entt::entity town = entt::null;
+      for (const auto entity : registry.view<const c::Building, const c::Owner>())
+        if (registry.get<c::Owner>(entity).player_id == 1) { town = entity; break; }
+      if (town == entt::null) return "no building for adjacent work";
+      const auto at = registry.get<c::Transform>(town).position;
+      const int id = registry.get<c::Identity>(town).unit_id;
+      const auto footprint = ECS::Buildings::FootprintOf(id);
+      const int x = Physics::TileOf(at.x) + footprint.x.high + 1;
+      const int y = Physics::TileOf(at.y);
+      const auto corner = grid.CornerHeight(x, y);
+      const int level = grid.GetTile(x - 1, y).elevation;
+      Core::WorldJobCommand command{workers(sim), WorldJobKind::RaiseGround, x, y, false, 1};
+      if (!ECS::world_jobs::order(registry, grid, command)) return "a mountain cannot touch a building";
+      const auto site = registry.view<c::WorldJob>().front();
+      if (!ECS::earthworks::finish(registry, grid, site)) return "work beside the building did not finish";
+      if (!registry.valid(town) || grid.GetTile(x - 1, y).elevation != level || grid.CornerHeight(x, y) != corner ||
+          registry.get<c::Transform>(town).position.x != at.x || registry.get<c::Transform>(town).position.y != at.y)
+        return "earthworks changed the building or its foundation";
+      registry.destroy(site);
       return nullptr;
     }
 
@@ -300,6 +507,11 @@ namespace Verify
   {
     const char* failure = gridRules();
     if (failure == nullptr) failure = orders();
+    if (failure == nullptr) failure = heights();
+    if (failure == nullptr) failure = freedom();
+    if (failure == nullptr) failure = noFreeSpace();
+    if (failure == nullptr) failure = shoreline();
+    if (failure == nullptr) failure = buildingsStay();
     if (failure == nullptr) failure = fog();
     if (failure == nullptr) failure = persistence();
     Core::CommandQueue::Get().PopAllCommands();

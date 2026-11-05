@@ -92,7 +92,7 @@ namespace ECS::world_jobs
     {
       const auto& job = registry.get<c::WorldJob>(entity);
       if (job.tileX == x && job.tileY == y) return false;
-      if (Core::isEarthwork(job.kind) && std::abs(job.tileX - x) <= 1 && std::abs(job.tileY - y) <= 1) return false;
+      if (Core::isEarthwork(job.kind) && earthworks::bounds(job.tileX, job.tileY, job.kind, job.rise).DistanceFrom(at).value == 0) return false;
     }
     // Pending foundations and the full body of a unit also reserve ground.
     for (const auto entity : registry.view<const c::Transform>())
@@ -112,6 +112,8 @@ namespace ECS::world_jobs
 
   bool order(entt::registry& registry, Physics::Grid& grid, const Core::WorldJobCommand& command, int levels)
   {
+    if (!Core::isMountainHeight(command.height)) return false;
+    if (levels == 0) levels = command.kind == Core::WorldJobKind::RaiseGround ? command.height : 1;
     if (command.player == Core::PLAYER_GAIA || command.player >= Core::kMaxPlayers ||
         !Core::isWorldJobKind(command.kind) || !grid.InBounds(command.tileX, command.tileY) ||
         !Vision::Visible(registry, command.player, command.tileX, command.tileY)) return false;
@@ -156,8 +158,18 @@ namespace ECS::world_jobs
       registry.emplace<c::Selectable>(site);
       registry.emplace<c::Planted>(site);
       registry.emplace<c::WorldJob>(site, c::WorldJob{command.kind, c::WorldJobPhase::Working,
-        command.tileX, command.tileY, cost, work.workMs * steps, {}, isEarthwork ? 0 : rules.growthMs, false, targetLevel});
-      showArt(registry, site, rules.siteUnit);
+        command.tileX, command.tileY, cost, work.workMs * steps, {}, isEarthwork ? 0 : rules.growthMs, false, targetLevel,
+        isEarthwork && command.kind == Core::WorldJobKind::RaiseGround ? steps : 1});
+      if (isEarthwork)
+      {
+        c::Sprite marker;
+        marker.slp_id = Core::worldcraft::workMarkerSlp(command.kind);
+        marker.still = true;
+        marker.angles = 1;
+        registry.emplace<c::Sprite>(site, marker);
+        registry.emplace<c::Identity>(site, rules.siteUnit);
+      }
+      else showArt(registry, site, rules.siteUnit);
       Players::AddStock(*player, Core::ResourceType::Wood, -cost);
     }
     for (const auto worker : crew)
@@ -205,16 +217,14 @@ namespace ECS::world_jobs
     bool append = command.append;
     for (const auto& [x, y] : tiles)
     {
-      if (order(registry, grid, {command.workers, command.kind, x, y, append, command.player}, layoutLevels(command, x, y)))
+      if (order(registry, grid, {command.workers, command.kind, x, y, append, command.player, command.height}, layoutLevels(command, x, y)))
         append = true;
     }
   }
 
-  int layoutLevels(const Core::PlantLayoutCommand& command, int x, int y)
+  int layoutLevels(const Core::PlantLayoutCommand& command, int, int)
   {
-    return command.kind == Core::WorldJobKind::RaiseGround && command.shape == Core::PlantShape::Area ?
-      1 + std::min({x - std::min(command.fromX, command.toX), std::max(command.fromX, command.toX) - x,
-        y - std::min(command.fromY, command.toY), std::max(command.fromY, command.toY) - y}) : 1;
+    return command.kind == Core::WorldJobKind::RaiseGround ? command.height : 1;
   }
 
   void cancel(entt::registry& registry, Physics::Grid& grid, entt::entity site, Core::PlayerId player)
@@ -264,7 +274,7 @@ namespace ECS::world_jobs
     sites.clear();
     for (const auto site : registry.view<c::WorldJob>()) sites.push_back(site);
     std::sort(sites.begin(), sites.end());
-    constexpr int terrainChangesPerTick = 8;
+    constexpr int terrainChangesPerTick = 2;
     int terrainChanges = 0;
     for (const auto site : sites)
     {
@@ -332,8 +342,14 @@ namespace ECS::world_jobs
       if (job.workedMs < Fixed32(job.workMs)) continue;
       if (Core::isEarthwork(job.kind))
       {
-        if (terrainChanges >= terrainChangesPerTick || !earthworks::finish(registry, grid, site)) continue;
+        job.clearanceWaitMs = std::max(0, job.clearanceWaitMs - dtMs);
+        if (terrainChanges >= terrainChangesPerTick || job.clearanceWaitMs > 0) continue;
         ++terrainChanges;
+        if (!earthworks::finish(registry, grid, site))
+        {
+          job.clearanceWaitMs = 1000;
+          continue;
+        }
         Fog::Going(registry, site);
         registry.destroy(site);
         continue;

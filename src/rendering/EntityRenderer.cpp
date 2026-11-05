@@ -5,6 +5,9 @@
 #include "UIRenderer.h"
 #include "FogRenderer.h"
 #include "Placement.h"
+#include "EarthworkMarker.h"
+#include "core/Worldcraft.h"
+#include "ecs/components/WorldJob.h"
 #include "Stipple.h"
 #include "ecs/components/Transform.h"
 #include "ecs/components/Sprite.h"
@@ -239,6 +242,7 @@ std::vector<Marker>& Markers() {
     return markers;
 }
 
+// Хранит геометрию, порядок рисования, выделение и видимость объекта кадра.
 struct RenderEntry {
     float depth;
     entt::entity ent;
@@ -274,6 +278,8 @@ struct RenderEntry {
     // of the blitter's masks goes over it -- kGhostClear, or the pulsing red
     // of the building's own piece or of the rest.
     uint8_t ghost;
+    Core::WorldJobKind earthworkKind{};
+    float workProgress = 0.0f;
 };
 constexpr uint8_t kGhostClear = 1;
 constexpr uint8_t kGhostBlockedMain = 2;
@@ -335,7 +341,10 @@ bool GroundLevel(int slp_id) {
 
 // Draws one entry's sprite, or its placeholder.
 void DrawSprite(SDL_Renderer* sdl_r, const RenderEntry& e) {
-    if (e.tex_ptr) {
+    if (Core::isEarthwork(e.earthworkKind)) {
+        earthwork_marker::draw(sdl_r, e.earthworkKind, e.sel_sx, e.sel_sy, e.workProgress,
+            e.ghost != 0, e.ghost == 0 || e.ghost == kGhostClear, e.fogged);
+    } else if (e.tex_ptr) {
         SDL_Texture* tex = static_cast<SDL_Texture*>(e.tex_ptr);
         if (e.flip_h) {
             SDL_RenderCopyExF(sdl_r, tex, &e.src, &e.dest, 0.0, nullptr, SDL_FLIP_HORIZONTAL);
@@ -442,8 +451,14 @@ entt::entity PickIn(const entt::registry& registry, const std::vector<RenderEntr
     for (size_t i = entries.size(); i-- > 0;) {
         const RenderEntry& e = entries[i];
         if (e.ground != ground) continue;
-        if (e.ent == entt::null || e.ghost != 0 || e.atlas == nullptr) continue;
+        if (e.ent == entt::null || e.ghost != 0) continue;
         if (!registry.valid(e.ent)) continue;
+        if (Core::isEarthwork(e.earthworkKind)) {
+            if (vx >= e.dest.x && vy >= e.dest.y && vx < e.dest.x + e.dest.w && vy < e.dest.y + e.dest.h &&
+                registry.all_of<ECS::Components::Selectable>(e.ent)) return e.ent;
+            continue;
+        }
+        if (e.atlas == nullptr) continue;
         const bool body = EntityRenderer::PickedByArt(registry, e.ent);
         const float margin = body ? static_cast<float>(kUnitMargin) : 0.0f;
         if (vx < e.dest.x - margin || vy < e.dest.y - margin ||
@@ -639,6 +654,15 @@ void EntityRenderer::DrawGroundLevel(ECS::Simulation& sim, Renderer& renderer, S
         e.sel_sx = sx;
         e.sel_sy = sy;
         e.mark = -1;
+        e.earthworkKind = Core::worldcraft::workMarkerKind(sprite.slp_id);
+        if (Core::isEarthwork(e.earthworkKind)) {
+            e.dest = earthwork_marker::bounds(sx, sy);
+            if (const auto* job = registry.try_get<ECS::Components::WorldJob>(entity))
+                e.workProgress = (job->workedMs / Core::Fixed32(job->workMs)).ToFloat();
+            if (e.is_selected || flash) e.mark = mark_of(entity, sx, sy, e.is_selected, flash);
+            entries.push_back(e);
+            return;
+        }
         
         // A composite graphic -- a ship's hull, sails and wake -- draws as its
         // pieces, each from its own atlas with its own facings, in the dat's
@@ -932,13 +956,23 @@ void EntityRenderer::DrawGroundLevel(ECS::Simulation& sim, Renderer& renderer, S
                 entries.push_back(e);
             }
             for (const Placement::Piece& piece : pieces) {
-                const HAL::GraphicFrame& gf = piece.atlas->frames[static_cast<size_t>(piece.frame)];
                 const float px = (piece.wx - piece.wy) * (Core::IsometricMath::TILE_WIDTH / 2.0f) - cx;
                 const float py = (piece.wx + piece.wy) * (Core::IsometricMath::TILE_HEIGHT / 2.0f) -
                                  cy - Ground::HeightPx(grid, piece.wx, piece.wy);
                 RenderEntry e{};
                 e.depth = piece.wx + piece.wy;
                 e.ent = entt::null;
+                e.sel_sx = px;
+                e.sel_sy = py;
+                e.ghost = piece.clear ? kGhostClear : piece.primary ? kGhostBlockedMain : kGhostBlocked;
+                e.earthworkKind = piece.earthworkKind;
+                if (Core::isEarthwork(piece.earthworkKind)) {
+                    e.dest = earthwork_marker::bounds(px, py);
+                    e.workProgress = 0.5f;
+                    entries.push_back(e);
+                    continue;
+                }
+                const HAL::GraphicFrame& gf = piece.atlas->frames[static_cast<size_t>(piece.frame)];
                 e.tex_ptr = piece.art.PageOf(gf.rect);
                 e.atlas = piece.atlas;
                 e.frame = piece.frame;

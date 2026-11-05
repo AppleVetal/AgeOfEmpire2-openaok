@@ -153,9 +153,12 @@ bool Grid::RestoreTiles(const std::vector<Tile>& saved) {
     for (const auto& tile : saved)
         if (tile.elevation < earthworkMinLevel || tile.elevation > 255 ||
             tile.terrain >= Core::TerrainType::COUNT || tile.originalTerrain >= Core::TerrainType::COUNT ||
-            (tile.earthwork != Earthwork::None && tile.earthwork != Earthwork::Raised && tile.earthwork != Earthwork::Ditch) ||
+            tile.earthwork > Earthwork::Lake || tile.pinnedCorners > 15 ||
             (tile.earthwork != Earthwork::None && (tile.elevation > earthworkMaxLevel ||
                 tile.originalElevation < earthworkMinLevel || tile.originalElevation > earthworkMaxLevel))) return false;
+    for (const auto& tile : saved)
+        for (const auto corner : tile.cornerHeights)
+            if (corner < earthworkMinLevel * 4 || corner > 255 * 4) return false;
     tiles = saved;
     // Everything that keeps something of the ground looks at it again.
     terrain_log.clear();
@@ -192,10 +195,38 @@ void Grid::LogTerrain(int x, int y)
     terrain_log.push_back(TerrainChange{terrain_revision, x, y});
 }
 
+int Grid::CornerHeight(int x, int y) const
+{
+    int sum = 0;
+    for (int dy = 0; dy < 2; ++dy)
+        for (int dx = 0; dx < 2; ++dx)
+        {
+            const int tx = std::clamp(x - 1 + dx, 0, width - 1);
+            const int ty = std::clamp(y - 1 + dy, 0, height - 1);
+            const auto& tile = GetTile(tx, ty);
+            const int corner = (1 - dy) * 2 + 1 - dx;
+            if ((tile.pinnedCorners & (1 << corner)) != 0) return tile.cornerHeights[corner];
+            sum += tile.elevation;
+        }
+    return sum;
+}
+
+void Grid::PinCorners(int x, int y, uint8_t mask)
+{
+    auto& tile = GetTileMut(x, y);
+    for (int corner = 0; corner < 4; ++corner)
+        if ((mask & (1 << corner)) != 0 && (tile.pinnedCorners & (1 << corner)) == 0)
+        {
+            tile.cornerHeights[corner] = static_cast<int16_t>(CornerHeight(x + corner % 2, y + corner / 2));
+            tile.pinnedCorners = static_cast<uint8_t>(tile.pinnedCorners | (1 << corner));
+        }
+}
+
 bool Grid::EarthworkBlocks(int x, int y) const
 {
     const auto& tile = GetTile(x, y);
     if (tile.earthwork == Earthwork::Ditch) return true;
+    if (tile.earthwork == Earthwork::Lake || tile.earthwork == Earthwork::Channel) return false;
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
         {
@@ -211,7 +242,7 @@ bool Grid::EarthworkBlocks(int x, int y) const
 bool Grid::SetEarthwork(int x, int y, int level, Earthwork kind)
 {
     if (!InBounds(x, y) || level < earthworkMinLevel || level > earthworkMaxLevel ||
-        (kind != Earthwork::None && kind != Earthwork::Raised && kind != Earthwork::Ditch)) return false;
+        kind > Earthwork::Lake) return false;
     auto& tile = GetTileMut(x, y);
     if (kind == Earthwork::None)
     {
@@ -219,16 +250,23 @@ bool Grid::SetEarthwork(int x, int y, int level, Earthwork kind)
         tile.terrain = tile.originalTerrain;
         tile.originalElevation = 0;
         tile.originalTerrain = Core::TerrainType::Grass1;
+        tile.pinnedCorners = 0;
+        tile.cornerHeights = {};
     }
     else
     {
         if (tile.earthwork == kind && tile.elevation == level) return false;
+        const bool wasWater = tile.terrain == Core::TerrainType::DeepWater || tile.terrain == Core::TerrainType::MediumWater ||
+            tile.terrain == Core::TerrainType::ShallowWater || tile.terrain == Core::TerrainType::Swamp;
         if (tile.earthwork == Earthwork::None)
         {
             tile.originalElevation = tile.elevation;
             tile.originalTerrain = tile.terrain;
         }
         if (kind == Earthwork::Ditch) tile.terrain = Core::TerrainType::Dirt2;
+        if (kind == Earthwork::Channel) tile.terrain = Core::TerrainType::Dirt3;
+        if (kind == Earthwork::Lake) tile.terrain = Core::TerrainType::MediumWater;
+        else if (wasWater) tile.terrain = Core::TerrainType::Sand;
     }
     tile.elevation = level;
     tile.earthwork = kind;

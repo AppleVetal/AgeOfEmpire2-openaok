@@ -16,6 +16,7 @@ class Renderer;
 //
 // Every screen rectangle the interface uses is produced by a function here, and
 // the input code hit-tests against those same functions.
+// Рисует игровую панель, формирует команды и хранит состояние её экранов.
 class UIRenderer {
 public:
     // The interface's two parts, each drawn at its own size (the Options' Top
@@ -116,6 +117,7 @@ public:
         Caption,      // words in a slot, not a button: the Market's "Sell:"
         PlantTree,
         Earthwork,
+        EarthworkHeight,
         CancelPlanting,
     };
     struct Command {
@@ -132,6 +134,7 @@ public:
         // button: the dat resource.
         int choice = -1;
         Core::WorldJobKind jobKind = Core::WorldJobKind::PlantTree;
+        int height = Core::mountainHeight;
         // A number the button shows on its face -- a Market button's price --
         // or -1.
         int label = -1;
@@ -155,6 +158,7 @@ public:
         bool enabled = false;
     };
     static constexpr int kCommandSlots = 15;   // a 5x3 grid
+    static constexpr int earthworkPage = 100;
 
     // What clicking a button asks the world to do. Page switches are the
     // interface's own business and never reach here.

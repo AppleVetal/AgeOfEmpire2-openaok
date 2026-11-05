@@ -6,7 +6,9 @@
 
 namespace ECS::earthworks
 {
-  Buildings::Bounds bounds(int x, int y);
+  bool isWater(Core::TerrainType terrain);
+  int radius(Core::WorldJobKind kind, int rise);
+  Buildings::Bounds bounds(int x, int y, Core::WorldJobKind kind = Core::WorldJobKind::DigDitch, int rise = 1);
   int targetLevel(const Physics::Tile& tile, Core::WorldJobKind kind, int levels = 1);
   bool canWork(const entt::registry& registry, const Physics::Grid& grid,
     Core::PlayerId player, int x, int y, Core::WorldJobKind kind,

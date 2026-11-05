@@ -52,6 +52,8 @@ const Physics::Grid& SeenGrid(const ECS::Simulation& sim, Core::PlayerId viewer)
             auto& tile = shown.GetTileMut(x, y);
             tile.terrain = remembered.terrain;
             tile.elevation = remembered.elevation;
+            tile.pinnedCorners = remembered.pinnedCorners;
+            tile.cornerHeights = remembered.cornerHeights;
         }
     }
     sourceSerial = grid.Serial();
@@ -69,8 +71,7 @@ uint32_t SeenRevision()
 }
 
 float CornerLevel(const Physics::Grid& grid, int i, int j) {
-    return 0.25f * static_cast<float>(Level(grid, i - 1, j - 1) + Level(grid, i, j - 1) +
-                                      Level(grid, i - 1, j) + Level(grid, i, j));
+    return 0.25f * static_cast<float>(grid.CornerHeight(i, j));
 }
 
 float HeightPx(const Physics::Grid& grid, float wx, float wy) {
@@ -100,6 +101,24 @@ float Light(const Physics::Grid& grid, int i, int j) {
 }
 
 std::pair<float, float> Pick(const Physics::Grid& grid, float screen_x, float screen_y) {
+    // Intersect the viewing ray from front to back. Fixed-point iteration
+    // oscillates on a steep mountain and can select ground behind its summit.
+    constexpr float step = kLevelPx / 4.0f;
+    float upper = Physics::earthworkMaxLevel * kLevelPx;
+    for (float height = upper; height >= Physics::earthworkMinLevel * kLevelPx; height -= step) {
+        const auto candidate = Core::IsometricMath::ScreenToWorld(screen_x, screen_y + height);
+        if (HeightPx(grid, candidate.first, candidate.second) >= height) {
+            float low = height, high = upper;
+            for (int i = 0; i < 10; ++i) {
+                const float mid = (low + high) * 0.5f;
+                const auto at = Core::IsometricMath::ScreenToWorld(screen_x, screen_y + mid);
+                if (HeightPx(grid, at.first, at.second) >= mid) low = mid;
+                else high = mid;
+            }
+            return Core::IsometricMath::ScreenToWorld(screen_x, screen_y + (low + high) * 0.5f);
+        }
+        upper = height;
+    }
     // The ground drawn at a screen point stands higher on a hill, so the world
     // point under it is further down the screen than a flat map says. A few
     // rounds of correction settle it.

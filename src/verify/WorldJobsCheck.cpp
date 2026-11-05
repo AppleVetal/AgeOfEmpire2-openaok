@@ -375,12 +375,14 @@ namespace Verify
       const auto hostKind = hasEarthworks ? Core::WorldJobKind::RaiseGround : Core::WorldJobKind::PlantTree;
       const auto clientKind = hasEarthworks ? Core::WorldJobKind::DigDitch : Core::WorldJobKind::PlantTree;
       if (!patch(host, 1, 3, 1, x, y, hostKind) || !patch(host, 2, 2, 2, cx, cy, clientKind)) return "no network work sites";
+      int peaks[3]{};
+      for (int i = 0; i < 3; ++i) peaks[i] = host.GetGrid().GetTile(x + i, y).elevation + Core::mountainHeight;
       Net::Issue(pair.host, Core::PlantLayoutCommand{workers(host, 1), x, y, x + 2, y,
         Core::PlantShape::Line, false, 1, hostKind});
       Net::Issue(pair.client, Core::PlantLayoutCommand{workers(host, 2), cx, cy, cx + 1, cy + 1,
         Core::PlantShape::Area, false, 2, clientKind});
-      constexpr uint64_t ticks = 10000;
-      const auto advance = [](Net::Session& session, ECS::Simulation& sim)
+      const uint64_t ticks = hasEarthworks ? 30000 : 10000;
+      const auto advance = [ticks](Net::Session& session, ECS::Simulation& sim)
       {
         std::vector<Core::Command> due;
         for (int i = 0; i < Net::kTicksPerTurn && sim.Tick() < ticks && Net::NextTick(session, due); ++i)
@@ -401,7 +403,14 @@ namespace Verify
       if (host.Tick() != ticks || client.Tick() != ticks) return "planting lockstep stalled";
       const int completed = hasEarthworks ? static_cast<int>(std::count_if(host.GetGrid().Tiles().begin(), host.GetGrid().Tiles().end(),
         [](const Physics::Tile& tile) { return tile.earthwork != Physics::Earthwork::None; })) : treeCount(host.GetRegistry());
-      if (completed != 7 || ECS::Digest::Of(host) != ECS::Digest::Of(client))
+      bool finished = hasEarthworks ? completed >= 7 : completed == 7;
+      if (hasEarthworks) {
+        for (int i = 0; i < 3; ++i) finished = finished && host.GetGrid().GetTile(x + i, y).elevation >= peaks[i];
+        for (int row = 0; row < 2; ++row)
+          for (int col = 0; col < 2; ++col) finished = finished && host.GetGrid().GetTile(cx + col, cy + row).earthwork == Physics::Earthwork::Ditch;
+        finished = finished && host.GetRegistry().view<c::WorldJob>().empty();
+      }
+      if (!finished || ECS::Digest::Of(host) != ECS::Digest::Of(client))
       {
         std::printf("  network planted=%d,%d sites=%zu,%zu\n", treeCount(host.GetRegistry()), treeCount(client.GetRegistry()),
           host.GetRegistry().view<c::WorldJob>().size(), client.GetRegistry().view<c::WorldJob>().size());

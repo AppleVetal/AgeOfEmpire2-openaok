@@ -14,7 +14,7 @@ namespace Core::worldcraft
   namespace
   {
     PlantRules loaded;
-    std::array<WorkRules, 3> earthRules;
+    std::array<WorkRules, 5> earthRules;
     std::map<std::string, std::string> strings;
 
     nlohmann::json read(const std::filesystem::path& path)
@@ -41,13 +41,13 @@ namespace Core::worldcraft
     {
       const auto manifest = read(root / "manifest.json");
       if (manifest.at("schema") != 1 || manifest.at("id") != "worldcraft" ||
-          manifest.at("version") != "0.2.0" || manifest.at("rules") != "rules.json" ||
+          manifest.at("version") != "0.3.0" || manifest.at("rules") != "rules.json" ||
           manifest.at("graphics") != "graphics.json" || manifest.at("strings") != "strings.ru.json")
         throw std::runtime_error("unsupported worldcraft manifest");
       const auto allRules = read(root / "rules.json");
       const auto rules = allRules.at("plant_tree");
-      std::array<WorkRules, 3> earthCandidate;
-      const std::array<const char*, 3> names{"raise_ground", "dig_ditch", "restore_ground"};
+      std::array<WorkRules, 5> earthCandidate;
+      const std::array<const char*, 5> names{"raise_ground", "dig_ditch", "restore_ground", "dig_channel", "dig_lake"};
       for (std::size_t i = 0; i < names.size(); ++i)
       {
         const auto& rule = allRules.at(names[i]);
@@ -65,7 +65,8 @@ namespace Core::worldcraft
       const auto words = read(root / "strings.ru.json");
       std::map<std::string, std::string> labels;
       for (const auto* key : {"plant", "plant_help", "line", "area", "cancel", "cancel_help", "working", "growing", "choose_site",
-          "raise_ground", "dig_ditch", "restore_ground", "earthwork_help", "line_shape", "area_shape"})
+          "raise_ground", "dig_ditch", "restore_ground", "dig_channel", "dig_lake", "earthwork_help", "line_shape", "area_shape",
+          "earthwork_menu", "hill_height", "mountain_height", "high_mountain_height", "height_help"})
       {
         const auto value = words.at(key).get<std::string>();
         if (value.empty() || value.size() > 4096) throw std::runtime_error(std::string("invalid text: ") + key);
@@ -138,6 +139,8 @@ namespace Core::worldcraft
     case WorldJobKind::RaiseGround: return text("raise_ground");
     case WorldJobKind::DigDitch: return text("dig_ditch");
     case WorldJobKind::RestoreGround: return text("restore_ground");
+    case WorldJobKind::DigChannel: return text("dig_channel");
+    case WorldJobKind::DigLake: return text("dig_lake");
     default: return text("working");
     }
   }
@@ -151,6 +154,11 @@ namespace Core::worldcraft
       for (auto at = result.find(key); at != std::string::npos; at = result.find(key, at))
         result.replace(at, key.size(), std::to_string(value));
     return result;
+  }
+
+  const std::string& heightName(int height)
+  {
+    return text(height == hillHeight ? "hill_height" : height == highMountainHeight ? "high_mountain_height" : "mountain_height");
   }
 
   std::string plantHelp()

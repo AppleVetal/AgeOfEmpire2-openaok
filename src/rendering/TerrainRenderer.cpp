@@ -301,7 +301,7 @@ constexpr size_t kMaxLiveChunks = 64;
 constexpr float kHalfZoom = 0.6f;
 // Room above a chunk for hills: a tile on high ground is drawn higher up the
 // screen than its flat position.
-constexpr float kHeadroomPx = 8.0f * Ground::kLevelPx;
+constexpr float kHeadroomPx = Physics::earthworkMaxLevel * Ground::kLevelPx;
 constexpr float kFootroomPx = 4.0f * Ground::kLevelPx;
 
 uint64_t g_frame = 0;

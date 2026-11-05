@@ -1,9 +1,10 @@
-#pragma once
+﻿#pragma once
 #include <SDL2/SDL.h>
 #include <cstdint>
 #include <vector>
 
 #include "ecs/Simulation.h"
+#include "core/Command.h"
 #include "hal/GraphicCache.h"
 
 namespace Rendering {
@@ -25,6 +26,7 @@ class Renderer;
 // * No shadow.
 namespace Placement {
 
+// Описывает отдельный спрайт или земляной маркер предварительного размещения.
 struct Piece {
     const HAL::GraphicAtlas* atlas = nullptr;
     HAL::ArtPlace art;               // in the player's colours
@@ -35,6 +37,7 @@ struct Piece {
     // The building's own piece -- the single building's draw -- rather than
     // an annex or a wall segment: it pulses through another red.
     bool primary = false;
+    Core::WorldJobKind earthworkKind{};
 };
 
 struct Outline {

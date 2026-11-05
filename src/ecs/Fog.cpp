@@ -195,7 +195,7 @@ void GroundChanging(entt::registry& registry, int x, int y, const Physics::Tile&
         auto it = std::lower_bound(list.begin(), list.end(), tile,
                                    [](const Ground& g, int32_t t) { return g.tile < t; });
         if (it != list.end() && it->tile == tile) continue;
-        list.insert(it, Ground{tile, was.terrain, was.elevation});
+        list.insert(it, Ground{tile, was.terrain, was.elevation, was.pinnedCorners, was.cornerHeights});
         Logged(*memory, x, y);
     }
 }

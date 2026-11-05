@@ -10,7 +10,7 @@ namespace ECS::world_jobs
   constexpr int activeSiteLimit = Core::worldcraft::siteLimit;
   bool canPlant(const entt::registry& registry, const Physics::Grid& grid,
     Core::PlayerId player, int x, int y);
-  bool order(entt::registry& registry, Physics::Grid& grid, const Core::WorldJobCommand& command, int levels = 1);
+  bool order(entt::registry& registry, Physics::Grid& grid, const Core::WorldJobCommand& command, int levels = 0);
   std::vector<std::pair<int, int>> layout(const Physics::Grid& grid, int fromX, int fromY,
     int toX, int toY, Core::PlantShape shape);
   void plantLayout(entt::registry& registry, Physics::Grid& grid, const Core::PlantLayoutCommand& command);

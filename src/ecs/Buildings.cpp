@@ -476,7 +476,7 @@ Site CheckAboveGround(const entt::registry& registry, Core::PlayerId player, int
     const Bounds ground = FootprintBounds({Core::Fixed32(tile_x), Core::Fixed32(tile_y)}, placed);
     for (const auto site : registry.view<const Components::WorldJob>()) {
         const auto& job = registry.get<Components::WorldJob>(site);
-        const auto reserved = Core::isEarthwork(job.kind) ? earthworks::bounds(job.tileX, job.tileY) :
+        const auto reserved = Core::isEarthwork(job.kind) ? earthworks::bounds(job.tileX, job.tileY, job.kind, job.rise) :
             TileBounds({Core::Fixed32(job.tileX), Core::Fixed32(job.tileY)});
         if (Overlap(ground, reserved)) return Site::Foundation;
     }

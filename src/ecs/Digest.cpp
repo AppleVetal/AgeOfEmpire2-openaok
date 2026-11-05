@@ -95,6 +95,8 @@ uint64_t Of(const Simulation& simulation)
     mix(tile.originalElevation);
     mix(static_cast<uint8_t>(tile.originalTerrain));
     mix(tile.earthBlocked);
+    mix(tile.pinnedCorners);
+    for (const auto corner : tile.cornerHeights) mix(corner);
   }
   std::vector<entt::entity> nodes;
   for (const auto entity : registry.view<const Components::Resource>()) nodes.push_back(entity);
@@ -124,6 +126,7 @@ uint64_t Of(const Simulation& simulation)
     mix(job.tileX); mix(job.tileY); mix(job.paidWood); mix(job.workMs);
     mix(job.workedMs.value); mix(job.growthLeftMs); mix(job.hasBlocked);
     mix(job.targetElevation);
+    mix(job.rise); mix(job.clearanceWaitMs);
   }
   nodes.clear();
   for (const auto entity : registry.view<const Components::WorldJobQueue>()) nodes.push_back(entity);
@@ -163,6 +166,8 @@ uint64_t Of(const Simulation& simulation)
         mix(tile.tile);
         mix(static_cast<uint8_t>(tile.terrain));
         mix(tile.elevation);
+        mix(tile.pinnedCorners);
+        for (const auto corner : tile.cornerHeights) mix(corner);
       }
     }
   return hash;

@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <vector>
+#include <array>
 #include <cstdint>
 #include "core/FixedPoint.h"
 #include "core/Types.h"
@@ -50,9 +51,9 @@ constexpr uint8_t kGateLocked = 0x80;
 // on (grass and beach let land units on, water does not), and nothing stands
 // on it. They are stored apart because they change apart: a felled tree frees
 // its tile; a dock stands on water.
-enum class Earthwork : uint8_t { None, Raised, Ditch };
+enum class Earthwork : uint8_t { None, Raised, Ditch, Channel, Lake };
 constexpr int earthworkMinLevel = -4;
-constexpr int earthworkMaxLevel = 8;
+constexpr int earthworkMaxLevel = 24;
 
 // Хранит грунт, высоту, препятствия и исходный рельеф изменённой клетки.
 struct Tile {
@@ -74,6 +75,8 @@ struct Tile {
     int originalElevation = 0;
     Core::TerrainType originalTerrain = Core::TerrainType::Grass1;
     bool earthBlocked = false;
+    uint8_t pinnedCorners = 0;
+    std::array<int16_t, 4> cornerHeights{}; // quarter-levels, NW/NE/SW/SE
 };
 
 // One change to a tile's ground during play: a farm planted, a foundation
@@ -87,6 +90,8 @@ struct TerrainChange {
 // Хранит карту и ревизии её поверхности и проходимости для каждого слоя движения.
 class Grid {
 public:
+    int CornerHeight(int x, int y) const;
+    void PinCorners(int x, int y, uint8_t mask);
     Grid(int width, int height);
     void Resize(int w, int h);
     // Recomputes a tile's passability, for every layer, from its ground and
