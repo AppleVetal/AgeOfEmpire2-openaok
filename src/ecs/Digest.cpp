@@ -16,6 +16,7 @@
 #include "ecs/components/Owner.h"
 #include "ecs/components/Transform.h"
 #include "ecs/components/WorldJob.h"
+#include "ecs/Fog.h"
 #include "ecs/components/Worker.h"
 
 namespace ECS::Digest {
@@ -90,6 +91,10 @@ uint64_t Of(const Simulation& simulation)
       (static_cast<uint64_t>(tile.is_walkable) << 2) |
       (static_cast<uint64_t>(tile.passable) << 8) |
       (static_cast<uint64_t>(tile.gate) << 16));
+    mix(static_cast<uint8_t>(tile.earthwork));
+    mix(tile.originalElevation);
+    mix(static_cast<uint8_t>(tile.originalTerrain));
+    mix(tile.earthBlocked);
   }
   std::vector<entt::entity> nodes;
   for (const auto entity : registry.view<const Components::Resource>()) nodes.push_back(entity);
@@ -118,6 +123,7 @@ uint64_t Of(const Simulation& simulation)
     mix(static_cast<uint8_t>(job.phase));
     mix(job.tileX); mix(job.tileY); mix(job.paidWood); mix(job.workMs);
     mix(job.workedMs.value); mix(job.growthLeftMs); mix(job.hasBlocked);
+    mix(job.targetElevation);
   }
   nodes.clear();
   for (const auto entity : registry.view<const Components::WorldJobQueue>()) nodes.push_back(entity);
@@ -148,6 +154,17 @@ uint64_t Of(const Simulation& simulation)
       mix(at->position.x.value); mix(at->position.y.value);
     }
   }
+  if (const auto* fog = Fog::Read(registry))
+    for (const auto& memory : fog->ground)
+    {
+      mix(memory.size());
+      for (const auto& tile : memory)
+      {
+        mix(tile.tile);
+        mix(static_cast<uint8_t>(tile.terrain));
+        mix(tile.elevation);
+      }
+    }
   return hash;
 }
 

@@ -1,6 +1,7 @@
 ﻿#include "core/Worldcraft.h"
 
 #include <fstream>
+#include <array>
 #include <map>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
@@ -13,6 +14,7 @@ namespace Core::worldcraft
   namespace
   {
     PlantRules loaded;
+    std::array<WorkRules, 3> earthRules;
     std::map<std::string, std::string> strings;
 
     nlohmann::json read(const std::filesystem::path& path)
@@ -39,10 +41,18 @@ namespace Core::worldcraft
     {
       const auto manifest = read(root / "manifest.json");
       if (manifest.at("schema") != 1 || manifest.at("id") != "worldcraft" ||
-          manifest.at("version") != "0.1.0" || manifest.at("rules") != "rules.json" ||
+          manifest.at("version") != "0.2.0" || manifest.at("rules") != "rules.json" ||
           manifest.at("graphics") != "graphics.json" || manifest.at("strings") != "strings.ru.json")
         throw std::runtime_error("unsupported worldcraft manifest");
-      const auto rules = read(root / "rules.json").at("plant_tree");
+      const auto allRules = read(root / "rules.json");
+      const auto rules = allRules.at("plant_tree");
+      std::array<WorkRules, 3> earthCandidate;
+      const std::array<const char*, 3> names{"raise_ground", "dig_ditch", "restore_ground"};
+      for (std::size_t i = 0; i < names.size(); ++i)
+      {
+        const auto& rule = allRules.at(names[i]);
+        earthCandidate[i] = {integer(rule, "wood_cost", 0, 1000), integer(rule, "work_ms", 16, 300000)};
+      }
       const auto art = read(root / "graphics.json").at("plant_tree");
       PlantRules candidate;
       candidate.woodCost = integer(rules, "wood_cost", 0, 10000);
@@ -54,13 +64,15 @@ namespace Core::worldcraft
       candidate.buttonIcon = integer(art, "button_command_icon", 0, 63);
       const auto words = read(root / "strings.ru.json");
       std::map<std::string, std::string> labels;
-      for (const auto* key : {"plant", "plant_help", "line", "area", "cancel", "cancel_help", "working", "growing", "choose_site"})
+      for (const auto* key : {"plant", "plant_help", "line", "area", "cancel", "cancel_help", "working", "growing", "choose_site",
+          "raise_ground", "dig_ditch", "restore_ground", "earthwork_help", "line_shape", "area_shape"})
       {
         const auto value = words.at(key).get<std::string>();
         if (value.empty() || value.size() > 4096) throw std::runtime_error(std::string("invalid text: ") + key);
         labels.emplace(key, value);
       }
       loaded = candidate;
+      earthRules = earthCandidate;
       strings = std::move(labels);
       return true;
     }
@@ -110,6 +122,35 @@ namespace Core::worldcraft
   const std::string& text(const std::string& key)
   {
     return strings.at(key);
+  }
+
+  WorkRules workRules(WorldJobKind kind)
+  {
+    if (kind == WorldJobKind::PlantTree) return {loaded.woodCost, loaded.workMs};
+    if (!isEarthwork(kind)) throw std::invalid_argument("invalid worldcraft job kind");
+    return earthRules.at(static_cast<std::size_t>(kind) - static_cast<std::size_t>(WorldJobKind::RaiseGround));
+  }
+
+  const std::string& jobName(WorldJobKind kind)
+  {
+    switch (kind)
+    {
+    case WorldJobKind::RaiseGround: return text("raise_ground");
+    case WorldJobKind::DigDitch: return text("dig_ditch");
+    case WorldJobKind::RestoreGround: return text("restore_ground");
+    default: return text("working");
+    }
+  }
+
+  std::string earthworkHelp(WorldJobKind kind)
+  {
+    auto result = jobName(kind) + ". " + text("earthwork_help");
+    const auto rules = workRules(kind);
+    for (const auto& [key, value] : {std::pair<std::string, int>{"{cost}", rules.woodCost},
+        {"{work}", (rules.workMs + 999) / 1000}, {"{limit}", siteLimit}})
+      for (auto at = result.find(key); at != std::string::npos; at = result.find(key, at))
+        result.replace(at, key.size(), std::to_string(value));
+    return result;
   }
 
   std::string plantHelp()

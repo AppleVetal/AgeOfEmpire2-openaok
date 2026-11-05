@@ -5,6 +5,7 @@
 #include "core/ConfigManager.h"
 #include "core/Worldcraft.h"
 #include "ecs/Buildings.h"
+#include "ecs/Earthworks.h"
 #include "ecs/Fog.h"
 #include "ecs/Navigation.h"
 #include "ecs/Orders.h"
@@ -91,6 +92,7 @@ namespace ECS::world_jobs
     {
       const auto& job = registry.get<c::WorldJob>(entity);
       if (job.tileX == x && job.tileY == y) return false;
+      if (Core::isEarthwork(job.kind) && std::abs(job.tileX - x) <= 1 && std::abs(job.tileY - y) <= 1) return false;
     }
     // Pending foundations and the full body of a unit also reserve ground.
     for (const auto entity : registry.view<const c::Transform>())
@@ -108,10 +110,10 @@ namespace ECS::world_jobs
     return true;
   }
 
-  bool order(entt::registry& registry, Physics::Grid& grid, const Core::WorldJobCommand& command)
+  bool order(entt::registry& registry, Physics::Grid& grid, const Core::WorldJobCommand& command, int levels)
   {
     if (command.player == Core::PLAYER_GAIA || command.player >= Core::kMaxPlayers ||
-        command.kind != Core::WorldJobKind::PlantTree || !grid.InBounds(command.tileX, command.tileY) ||
+        !Core::isWorldJobKind(command.kind) || !grid.InBounds(command.tileX, command.tileY) ||
         !Vision::Visible(registry, command.player, command.tileX, command.tileY)) return false;
     auto crew = command.workers;
     std::sort(crew.begin(), crew.end());
@@ -136,10 +138,17 @@ namespace ECS::world_jobs
     if (site == entt::null)
     {
       const auto& rules = Core::worldcraft::plantRules();
+      const bool isEarthwork = Core::isEarthwork(command.kind);
+      if (isEarthwork ? !earthworks::canWork(registry, grid, command.player, command.tileX, command.tileY, command.kind, levels) :
+          !canPlant(registry, grid, command.player, command.tileX, command.tileY)) return false;
+      const auto& tile = grid.GetTile(command.tileX, command.tileY);
+      const int targetLevel = isEarthwork ? earthworks::targetLevel(tile, command.kind, levels) : 0;
+      const int steps = isEarthwork ? std::max(1, std::abs(targetLevel - tile.elevation)) : 1;
+      const auto work = Core::worldcraft::workRules(command.kind);
+      const int cost = work.woodCost * steps;
       auto* player = Players::Find(registry, command.player);
       if (active >= activeSiteLimit || player == nullptr ||
-          Players::Stock(*player, Core::ResourceType::Wood) < rules.woodCost ||
-          !canPlant(registry, grid, command.player, command.tileX, command.tileY)) return false;
+          Players::Stock(*player, Core::ResourceType::Wood) < cost) return false;
       site = registry.create();
       const c::Vector2D at{Fixed32(command.tileX), Fixed32(command.tileY)};
       registry.emplace<c::Transform>(site, at, at);
@@ -147,9 +156,9 @@ namespace ECS::world_jobs
       registry.emplace<c::Selectable>(site);
       registry.emplace<c::Planted>(site);
       registry.emplace<c::WorldJob>(site, c::WorldJob{command.kind, c::WorldJobPhase::Working,
-        command.tileX, command.tileY, rules.woodCost, rules.workMs, {}, rules.growthMs});
+        command.tileX, command.tileY, cost, work.workMs * steps, {}, isEarthwork ? 0 : rules.growthMs, false, targetLevel});
       showArt(registry, site, rules.siteUnit);
-      Players::AddStock(*player, Core::ResourceType::Wood, -rules.woodCost);
+      Players::AddStock(*player, Core::ResourceType::Wood, -cost);
     }
     for (const auto worker : crew)
     {
@@ -195,8 +204,17 @@ namespace ECS::world_jobs
     const auto tiles = layout(grid, command.fromX, command.fromY, command.toX, command.toY, command.shape);
     bool append = command.append;
     for (const auto& [x, y] : tiles)
-      if (order(registry, grid, {command.workers, Core::WorldJobKind::PlantTree, x, y, append, command.player}))
+    {
+      if (order(registry, grid, {command.workers, command.kind, x, y, append, command.player}, layoutLevels(command, x, y)))
         append = true;
+    }
+  }
+
+  int layoutLevels(const Core::PlantLayoutCommand& command, int x, int y)
+  {
+    return command.kind == Core::WorldJobKind::RaiseGround && command.shape == Core::PlantShape::Area ?
+      1 + std::min({x - std::min(command.fromX, command.toX), std::max(command.fromX, command.toX) - x,
+        y - std::min(command.fromY, command.toY), std::max(command.fromY, command.toY) - y}) : 1;
   }
 
   void cancel(entt::registry& registry, Physics::Grid& grid, entt::entity site, Core::PlayerId player)
@@ -246,6 +264,8 @@ namespace ECS::world_jobs
     sites.clear();
     for (const auto site : registry.view<c::WorldJob>()) sites.push_back(site);
     std::sort(sites.begin(), sites.end());
+    constexpr int terrainChangesPerTick = 8;
+    int terrainChanges = 0;
     for (const auto site : sites)
     {
       auto& job = registry.get<c::WorldJob>(site);
@@ -286,7 +306,7 @@ namespace ECS::world_jobs
         continue;
       }
       if (working == 0) continue;
-      if (!job.hasBlocked)
+      if (!Core::isEarthwork(job.kind) && !job.hasBlocked)
       {
         const auto ground = Buildings::TileBounds({Fixed32(job.tileX), Fixed32(job.tileY)});
         bool isOccupied = false;
@@ -310,6 +330,14 @@ namespace ECS::world_jobs
       job.workedMs = std::min(Fixed32(job.workMs), job.workedMs +
         Fixed32(dtMs) * Fixed32(working + 2) / Fixed32(3));
       if (job.workedMs < Fixed32(job.workMs)) continue;
+      if (Core::isEarthwork(job.kind))
+      {
+        if (terrainChanges >= terrainChangesPerTick || !earthworks::finish(registry, grid, site)) continue;
+        ++terrainChanges;
+        Fog::Going(registry, site);
+        registry.destroy(site);
+        continue;
+      }
       Fog::Going(registry, site);
       job.phase = c::WorldJobPhase::Growing;
       showArt(registry, site, rules.growingUnit);

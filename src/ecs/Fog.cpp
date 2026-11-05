@@ -183,19 +183,19 @@ void Going(entt::registry& registry, entt::entity thing) {
     if (players != 0) Picture(registry, thing, players);
 }
 
-void GroundChanging(entt::registry& registry, int x, int y, Core::TerrainType was) {
+void GroundChanging(entt::registry& registry, int x, int y, const Physics::Tile& was) {
     Memory* memory = registry.ctx().find<Memory>();
     const int width = Width(registry);
     if (memory == nullptr || width <= 0) return;
     const int32_t tile = y * width + x;
     for (Core::PlayerId p = 1; p < Core::kMaxPlayers; ++p) {
         if (Players::Find(registry, p) == nullptr) continue;
-        if (!Vision::Explored(registry, p, x, y) || Vision::Visible(registry, p, x, y)) continue;
+        if (Vision::Visible(registry, p, x, y)) continue;
         auto& list = memory->ground[p];
         auto it = std::lower_bound(list.begin(), list.end(), tile,
                                    [](const Ground& g, int32_t t) { return g.tile < t; });
         if (it != list.end() && it->tile == tile) continue;
-        list.insert(it, Ground{tile, was});
+        list.insert(it, Ground{tile, was.terrain, was.elevation});
         Logged(*memory, x, y);
     }
 }
@@ -203,7 +203,8 @@ void GroundChanging(entt::registry& registry, int x, int y, Core::TerrainType wa
 Core::TerrainType GroundSeen(const entt::registry& registry, Core::PlayerId viewer, int x, int y,
                              Core::TerrainType now) {
     const Memory* memory = registry.ctx().find<Memory>();
-    if (memory == nullptr || viewer >= Core::kMaxPlayers || memory->ground[viewer].empty()) return now;
+    if (memory == nullptr || viewer >= Core::kMaxPlayers || memory->ground[viewer].empty() ||
+        Vision::Visible(registry, viewer, x, y)) return now;
     const int32_t tile = y * Width(registry) + x;
     const auto& list = memory->ground[viewer];
     auto it = std::lower_bound(list.begin(), list.end(), tile,
@@ -213,6 +214,18 @@ Core::TerrainType GroundSeen(const entt::registry& registry, Core::PlayerId view
 
 const Memory* Read(const entt::registry& registry) {
     return registry.ctx().find<Memory>();
+}
+
+int ElevationSeen(const entt::registry& registry, Core::PlayerId viewer, int x, int y, int now)
+{
+    const auto* memory = Read(registry);
+    if (memory == nullptr || viewer >= Core::kMaxPlayers || memory->ground[viewer].empty() ||
+        Vision::Visible(registry, viewer, x, y)) return now;
+    const int32_t tile = y * Width(registry) + x;
+    const auto& list = memory->ground[viewer];
+    const auto found = std::lower_bound(list.begin(), list.end(), tile,
+        [](const Ground& ground, int32_t value) { return ground.tile < value; });
+    return found != list.end() && found->tile == tile ? found->elevation : now;
 }
 
 } // namespace ECS::Fog

@@ -16,6 +16,8 @@ class Simulation;
 
 namespace Verify {
 bool CheckWorldJobs();
+bool CheckEarthworks();
+bool CheckEarthworksNetwork();
 bool CheckForestNetwork();
 
 // A digest of the world's state -- every entity's place, hit points, owner and

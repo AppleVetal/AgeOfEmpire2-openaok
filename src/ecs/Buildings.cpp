@@ -1,6 +1,7 @@
 ﻿#include "ecs/Buildings.h"
 #include "ecs/Mortality.h"
 #include "ecs/components/WorldJob.h"
+#include "ecs/Earthworks.h"
 
 #include "ecs/Events.h"
 #include "ecs/Garrisons.h"
@@ -265,7 +266,7 @@ void LayGround(entt::registry& registry, Physics::Grid& grid, int unit_id, int t
         if (!grid.InBounds(x, y)) return;
         const Core::TerrainType was = grid.GetTile(x, y).terrain;
         if (was == terrain) return;
-        Fog::GroundChanging(registry, x, y, was);
+        Fog::GroundChanging(registry, x, y, grid.GetTile(x, y));
         grid.SetTerrain(x, y, terrain);
     });
 }
@@ -475,7 +476,8 @@ Site CheckAboveGround(const entt::registry& registry, Core::PlayerId player, int
     const Bounds ground = FootprintBounds({Core::Fixed32(tile_x), Core::Fixed32(tile_y)}, placed);
     for (const auto site : registry.view<const Components::WorldJob>()) {
         const auto& job = registry.get<Components::WorldJob>(site);
-        const auto reserved = TileBounds({Core::Fixed32(job.tileX), Core::Fixed32(job.tileY)});
+        const auto reserved = Core::isEarthwork(job.kind) ? earthworks::bounds(job.tileX, job.tileY) :
+            TileBounds({Core::Fixed32(job.tileX), Core::Fixed32(job.tileY)});
         if (Overlap(ground, reserved)) return Site::Foundation;
     }
     auto sites = registry.view<const Components::Building, const Components::Identity,

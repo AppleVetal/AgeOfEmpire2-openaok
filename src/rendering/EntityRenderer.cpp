@@ -1,4 +1,4 @@
-#include "EntityRenderer.h"
+﻿#include "EntityRenderer.h"
 #include "core/FixedMath.h"
 #include "Renderer.h"
 #include "Ground.h"
@@ -503,7 +503,7 @@ void EntityRenderer::DrawGroundLevel(ECS::Simulation& sim, Renderer& renderer, S
         return !ECS::Vision::Visible(registry, Core::LocalPlayer(), Physics::TileOf(at->position.x),
                                      Physics::TileOf(at->position.y));
     };
-    const auto& grid = sim.GetGrid();
+    const auto& grid = Ground::SeenGrid(sim);
     auto view = registry.view<ECS::Components::Transform, ECS::Components::Sprite>();
     
     float margin = 200.0f;

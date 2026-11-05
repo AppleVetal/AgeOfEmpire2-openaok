@@ -372,7 +372,17 @@ struct DisbandCommand {
     PlayerId player;
 };
 
-enum class WorldJobKind : uint8_t { PlantTree = 1 };
+enum class WorldJobKind : uint8_t { PlantTree = 1, RaiseGround, DigDitch, RestoreGround };
+
+constexpr bool isEarthwork(WorldJobKind kind)
+{
+  return kind == WorldJobKind::RaiseGround || kind == WorldJobKind::DigDitch || kind == WorldJobKind::RestoreGround;
+}
+
+constexpr bool isWorldJobKind(WorldJobKind kind)
+{
+  return kind == WorldJobKind::PlantTree || isEarthwork(kind);
+}
 
 // Передаёт приказ группе жителей выполнить или поставить в очередь работу на клетке.
 struct WorldJobCommand
@@ -405,6 +415,7 @@ struct PlantLayoutCommand
   PlantShape shape = PlantShape::Line;
   bool append = false;
   PlayerId player = PLAYER_NONE;
+  WorldJobKind kind = WorldJobKind::PlantTree;
 };
 
 using Command = std::variant<MoveCommand, GatherCommand, AttackCommand,

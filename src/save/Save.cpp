@@ -70,7 +70,7 @@ namespace C = ECS::Components;
 
 constexpr char kMagic[8] = {'A', 'O', 'K', 'C', 'S', 'A', 'V', 'E'};
 // The save format's version; a save of any other version is refused.
-constexpr uint32_t kVersion = 13;
+constexpr uint32_t kVersion = 14;
 
 // Plain data goes out as it lies in memory.
 template <typename T>
@@ -117,11 +117,13 @@ void Get(Reader& r, C::WorldJobQueue& queue) {
 }
 void Get(Reader& r, C::WorldJob& job) {
     GetPod(r, job);
-    if (job.kind != Core::WorldJobKind::PlantTree ||
+    if (!Core::isWorldJobKind(job.kind) ||
         (job.phase != C::WorldJobPhase::Working && job.phase != C::WorldJobPhase::Growing) ||
         job.workMs < 16 || job.workMs > 3600000 || job.workedMs.value < 0 ||
-        job.workedMs > Core::Fixed32(job.workMs) || job.paidWood < 0 || job.paidWood > 10000 ||
-        job.growthLeftMs < 0 || job.growthLeftMs > 3600000) r.ok = false;
+        job.workedMs > Core::Fixed32(job.workMs) || job.paidWood < 0 || job.paidWood > 12000 ||
+        job.growthLeftMs < 0 || job.growthLeftMs > 3600000 ||
+        job.targetElevation < Physics::earthworkMinLevel || job.targetElevation > Physics::earthworkMaxLevel ||
+        (Core::isEarthwork(job.kind) && (job.phase != C::WorldJobPhase::Working || job.hasBlocked))) r.ok = false;
 }
 void Put(Writer& w, const C::Path& p) {
     PutPods(w, p.waypoints);

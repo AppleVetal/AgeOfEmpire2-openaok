@@ -1227,7 +1227,7 @@ private:
 
 void UIRenderer::DrawMinimapIn(ECS::Simulation& sim, Renderer& renderer, SDL_Renderer* sdl_r,
                                const SDL_FRect& well, const SDL_FRect& view) {
-    auto& grid = sim.GetGrid();
+    const auto& grid = Ground::SeenGrid(sim);
     auto& graphics = HAL::GraphicCache::Get();
     const int tex_w = static_cast<int>(well.w);
     const int tex_h = static_cast<int>(well.h);
@@ -1241,7 +1241,7 @@ void UIRenderer::DrawMinimapIn(ECS::Simulation& sim, Renderer& renderer, SDL_Ren
     static int cached_h = 0;
     static uint32_t cached_revision = 0;
     static uint32_t cached_game = 0;
-    const uint32_t revision = grid.TerrainRevision();
+    const uint32_t revision = Ground::SeenRevision();
     if (!minimap_tex || cached_w != tex_w || cached_h != tex_h || cached_revision != revision ||
         cached_game != g_game) {
         cached_game = g_game;
@@ -1672,6 +1672,18 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
                 command->choice = static_cast<int>(Core::PlantShape::Area);
             }
             order(kSlotCancelPlanting, CommandKind::CancelPlanting, kIconCancel, -1);
+            constexpr int earthSlots[6] = {9, 11, 12, 13, 14, 15};
+            constexpr Core::WorldJobKind earthKinds[3] = {Core::WorldJobKind::RaiseGround,
+                Core::WorldJobKind::DigDitch, Core::WorldJobKind::RestoreGround};
+            for (int i = 0; i < 6; ++i) {
+                if (auto* command = order(earthSlots[i], CommandKind::Earthwork, kIconRepair, -1)) {
+                    command->jobKind = earthKinds[i / 2];
+                    command->choice = static_cast<int>(i % 2 == 0 ? Core::PlantShape::Line : Core::PlantShape::Area);
+                    const auto* player = ECS::Players::Find(registry, LocalViewer());
+                    command->affordable = player != nullptr && ECS::Players::Stock(*player, Core::ResourceType::Wood) >=
+                        Core::worldcraft::workRules(command->jobKind).woodCost;
+                }
+            }
         } else {
             hotkey_group = Core::Hotkeys::kBuild;
             // Inside a build menu: every building the player can build that
@@ -1955,6 +1967,8 @@ UIRenderer::Action UIRenderer::ActivateCommand(const Command& command) {
     switch (command.kind) {
     case CommandKind::PlantTree:
         return Action::PlantTree;
+    case CommandKind::Earthwork:
+        return Action::Earthwork;
     case CommandKind::CancelPlanting:
         return Action::CancelPlanting;
     case CommandKind::SwitchPage:
@@ -2221,15 +2235,26 @@ void DrawCommandPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int 
         DrawIcon(sdl_r, cmd.icon_slp, cmd.icon_frame, SDL_Rect{x + 2, y + 2, 36, 36},
                  LocalViewer(), cmd.enabled ? 255 : 110);
         Bevel(sdl_r, x, y, 40, 40, pressed);
-        if (cmd.kind == UIRenderer::CommandKind::PlantTree) {
+        if (cmd.kind == UIRenderer::CommandKind::PlantTree || cmd.kind == UIRenderer::CommandKind::Earthwork) {
             // Tree symbols arranged as a line or a patch distinguish the two modes.
             Fill(sdl_r, x + 3, y + 3, 34, 34, kBlack);
             const int rows = cmd.choice == static_cast<int>(Core::PlantShape::Area) ? 3 : 1;
             for (int row = 0; row < rows; ++row) {
                 for (int col = 0; col < 3; ++col) {
                     const int tx = x + 7 + col * 10, ty = y + (rows == 1 ? 15 : 5) + row * 10;
-                    Fill(sdl_r, tx + 2, ty + 4, 2, 5, kWhite);
-                    Fill(sdl_r, tx, ty, 6, 6, kHealthGreen);
+                    if (cmd.jobKind == Core::WorldJobKind::RaiseGround) {
+                        for (int level = 0; level < 4; ++level)
+                            Fill(sdl_r, tx + 3 - level, ty + level * 2, 1 + level * 2, 2, kWhite);
+                    } else if (cmd.jobKind == Core::WorldJobKind::DigDitch) {
+                        Fill(sdl_r, tx, ty, 2, 6, kWhite);
+                        Fill(sdl_r, tx + 5, ty, 2, 6, kWhite);
+                        Fill(sdl_r, tx, ty + 6, 7, 2, kWhite);
+                    } else if (cmd.jobKind == Core::WorldJobKind::RestoreGround) {
+                        Fill(sdl_r, tx, ty + 3, 7, 3, kHealthGreen);
+                    } else {
+                        Fill(sdl_r, tx + 2, ty + 4, 2, 5, kWhite);
+                        Fill(sdl_r, tx, ty, 6, 6, kHealthGreen);
+                    }
                 }
             }
         }
@@ -2310,7 +2335,8 @@ void DrawUnitPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int win
 
     const auto* worldJob = registry.try_get<ECS::Components::WorldJob>(selected);
     const std::string& name = worldJob != nullptr
-        ? Core::worldcraft::text(worldJob->phase == ECS::Components::WorldJobPhase::Working ? "working" : "growing")
+        ? (worldJob->phase == ECS::Components::WorldJobPhase::Working ? Core::worldcraft::jobName(worldJob->kind) :
+            Core::worldcraft::text("growing"))
         : cfg.GetUnitName(unit_id);
     if (!name.empty()) {
         Text::Draw(sdl_r, Text::kGeorgia9B, layout.name.x, layout.name.y, name, kBlack);
@@ -2507,6 +2533,9 @@ const UIRenderer::Command* HoveredCommand(const UIRenderer::Command* commands, i
 } // namespace
 
 std::string UIRenderer::CommandHelp(ECS::Simulation& sim, const Command& command) {
+    if (command.kind == CommandKind::Earthwork)
+        return Core::worldcraft::text(command.choice == static_cast<int>(Core::PlantShape::Area) ? "area_shape" : "line_shape") +
+            ". " + Core::worldcraft::earthworkHelp(command.jobKind);
     if (command.kind == CommandKind::PlantTree)
         return Core::worldcraft::text(command.choice == static_cast<int>(Core::PlantShape::Area)
             ? "area" : "line") + ". " + Core::worldcraft::plantHelp();
@@ -2605,6 +2634,8 @@ void UIRenderer::DrawHelpText(ECS::Simulation& sim, SDL_Renderer* sdl_r, int win
         return Core::InputManager::Get().planting(x, y, shape);
     }()) {
         text = Core::worldcraft::text("choose_site");
+        const auto kind = Core::InputManager::Get().workKind();
+        if (Core::isEarthwork(kind)) text = Core::worldcraft::jobName(kind) + ". " + text;
         if (const auto at = text.find("{limit}"); at != std::string::npos)
             text.replace(at, 7, std::to_string(Core::worldcraft::siteLimit));
     } else if (hud.world_hint >= 0) {

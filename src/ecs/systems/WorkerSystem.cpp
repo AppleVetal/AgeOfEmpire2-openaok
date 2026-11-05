@@ -1,6 +1,7 @@
 ﻿#include "WorkerSystem.h"
 #include "ecs/components/Worker.h"
 #include "ecs/components/WorldJob.h"
+#include "ecs/Earthworks.h"
 #include "ecs/components/Resource.h"
 #include "ecs/components/Transform.h"
 #include "ecs/components/Path.h"
@@ -1100,7 +1101,9 @@ void WorkerSystem::Update(entt::registry& registry, Physics::Grid& grid, int32_t
                 const auto target = worker.target_building;
                 if (!registry.valid(target) || !registry.all_of<Components::WorldJob, Components::Transform>(target)) break;
                 const auto& site = registry.get<Components::Transform>(target).position;
-                const auto ground = ECS::Buildings::TileBounds(site);
+                const auto& job = registry.get<Components::WorldJob>(target);
+                const auto ground = Core::isEarthwork(job.kind) ? earthworks::bounds(job.tileX, job.tileY) :
+                    ECS::Buildings::TileBounds(site);
                 switch (ApproachGround(registry, grid, entity, worker, transform, target, ground, kDefaultWorkRange)) {
                 case Approach::Arrived:
                     worker.working = true;

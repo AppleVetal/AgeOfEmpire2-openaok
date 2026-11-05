@@ -1,4 +1,4 @@
-#include "TerrainRenderer.h"
+﻿#include "TerrainRenderer.h"
 #include "Ground.h"
 #include "Renderer.h"
 #include "core/IsometricMath.h"
@@ -302,6 +302,7 @@ constexpr float kHalfZoom = 0.6f;
 // Room above a chunk for hills: a tile on high ground is drawn higher up the
 // screen than its flat position.
 constexpr float kHeadroomPx = 8.0f * Ground::kLevelPx;
+constexpr float kFootroomPx = 4.0f * Ground::kLevelPx;
 
 uint64_t g_frame = 0;
 
@@ -331,7 +332,7 @@ static ChunkBox BoxOf(int cx, int cy) {
     const float min_x = std::min({top.x, right.x, bottom.x, left.x});
     const float max_x = std::max({top.x, right.x, bottom.x, left.x});
     const float min_y = std::min({top.y, right.y, bottom.y, left.y}) - kHeadroomPx;
-    const float max_y = std::max({top.y, right.y, bottom.y, left.y});
+    const float max_y = std::max({top.y, right.y, bottom.y, left.y}) + kFootroomPx;
     return {min_x, min_y,
             static_cast<int>(std::ceil(max_x - min_x + Core::IsometricMath::TILE_WIDTH)),
             static_cast<int>(std::ceil(max_y - min_y + Core::IsometricMath::TILE_HEIGHT))};
@@ -700,7 +701,10 @@ void TerrainRenderer::InvalidateChunks() {
 }
 
 void TerrainRenderer::DrawTerrain(ECS::Simulation& sim, Renderer& renderer, SDL_Renderer* sdl_r) {
-    const auto& grid = sim.GetGrid();
+    const auto& grid = Ground::SeenGrid(sim);
+    static uint32_t lastSerial = 0;
+    if (lastSerial != grid.Serial() || g_viewer != Core::LocalPlayer()) InvalidateChunks();
+    lastSerial = grid.Serial();
     ++g_frame;
     g_registry = &sim.GetRegistry();
     g_viewer = Core::LocalPlayer();

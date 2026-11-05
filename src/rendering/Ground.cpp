@@ -1,9 +1,12 @@
-#include "Ground.h"
+﻿#include "Ground.h"
 
 #include <algorithm>
 #include <cmath>
 
 #include "core/IsometricMath.h"
+#include "ecs/Simulation.h"
+#include "ecs/Fog.h"
+#include "ecs/Vision.h"
 
 namespace Rendering::Ground {
 
@@ -18,8 +21,52 @@ int Level(const Physics::Grid& grid, int x, int y) {
 // How much each level of slope across a tile turns it toward or away from
 // the light.
 constexpr float kPerLevel = 0.5f;
+uint32_t seenRevision = 0;
 
 } // namespace
+
+const Physics::Grid& SeenGrid(const ECS::Simulation& sim, Core::PlayerId viewer)
+{
+    static Physics::Grid shown(1, 1);
+    static uint32_t sourceSerial = 0, terrainRevision = 0, memoryRevision = 0;
+    static Core::PlayerId lastViewer = Core::PLAYER_NONE;
+    static uint16_t lastSeeAll = 0;
+    const auto& grid = sim.GetGrid();
+    const auto& registry = sim.GetRegistry();
+    const auto* memory = ECS::Fog::Read(registry);
+    const auto* vision = ECS::Vision::MapOf(registry);
+    const auto revision = memory != nullptr ? memory->revision : 0;
+    const uint16_t seeAll = vision != nullptr ? vision->see_all : 0;
+    const bool hasMemory = memory != nullptr && viewer < Core::kMaxPlayers && !memory->ground[viewer].empty();
+    if (sourceSerial == grid.Serial() && terrainRevision == grid.TerrainRevision() &&
+        memoryRevision == revision && lastViewer == viewer && lastSeeAll == seeAll) return hasMemory ? shown : grid;
+    // Reuse vector capacity. Nothing is allocated or copied while the map and
+    // its remembered surface are unchanged, including ordinary unit movement.
+    if (hasMemory)
+    {
+        shown = grid;
+        for (const auto& remembered : memory->ground[viewer])
+        {
+            const int x = remembered.tile % grid.GetWidth(), y = remembered.tile / grid.GetWidth();
+            if (!grid.InBounds(x, y) || ECS::Vision::Visible(registry, viewer, x, y)) continue;
+            auto& tile = shown.GetTileMut(x, y);
+            tile.terrain = remembered.terrain;
+            tile.elevation = remembered.elevation;
+        }
+    }
+    sourceSerial = grid.Serial();
+    terrainRevision = grid.TerrainRevision();
+    memoryRevision = revision;
+    lastViewer = viewer;
+    lastSeeAll = seeAll;
+    ++seenRevision;
+    return hasMemory ? shown : grid;
+}
+
+uint32_t SeenRevision()
+{
+    return seenRevision;
+}
 
 float CornerLevel(const Physics::Grid& grid, int i, int j) {
     return 0.25f * static_cast<float>(Level(grid, i - 1, j - 1) + Level(grid, i, j - 1) +

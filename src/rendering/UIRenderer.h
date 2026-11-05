@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include <string>
 #include "core/Types.h"
+#include "core/Command.h"
 #include "ecs/Simulation.h"
 
 namespace Rendering {
@@ -114,6 +115,7 @@ public:
         BackToWork,   // the villagers inside the selected building sent back to work
         Caption,      // words in a slot, not a button: the Market's "Sell:"
         PlantTree,
+        Earthwork,
         CancelPlanting,
     };
     struct Command {
@@ -129,6 +131,7 @@ public:
         // For a Stance or Formation button: which one. For a Sell or Buy
         // button: the dat resource.
         int choice = -1;
+        Core::WorldJobKind jobKind = Core::WorldJobKind::PlantTree;
         // A number the button shows on its face -- a Market button's price --
         // or -1.
         int label = -1;
@@ -159,7 +162,7 @@ public:
                         SetStance, Stop, Ungarrison, TownBell, Patrol, Guard, Follow,
                         Garrison, Repair, Sell, Buy, LockGate, Pack, Treason, Convert,
                         Heal, Unload, GatherPoint, RemoveGatherPoint, CancelOrder,
-                        BackToWork, Form, Disband, PlantTree, CancelPlanting };
+                        BackToWork, Form, Disband, PlantTree, Earthwork, CancelPlanting };
 
     // The formation the player last chose; a group move marches in it.
     static Core::Formation CurrentFormation();
