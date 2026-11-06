@@ -11,6 +11,7 @@
 #include "ecs/Techs.h"
 #include "ecs/Walls.h"
 #include "ecs/WorldJobs.h"
+#include "ecs/Earthworks.h"
 #include "core/Worldcraft.h"
 #include "hal/Window.h"
 #include "rendering/Ground.h"
@@ -63,7 +64,7 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
         SDL_GetMouseState(&mx, &my);
     }
     const float inv_zoom = 1.0f / renderer.camera_zoom;
-    const auto world = Ground::Pick(grid, renderer.camera_x + mx * inv_zoom,
+    const auto world = Ground::Pick(Ground::SeenGrid(sim), renderer.camera_x + mx * inv_zoom,
                                     renderer.camera_y + my * inv_zoom);
     // The tile under the cursor: tiles are centred on whole numbers. A wall
     // is laid tile by tile; anything else is placed with its middle there.
@@ -104,15 +105,39 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
         Core::InputManager::Get().planting(plantFromX, plantFromY, plantShape);
         const auto tiles = ECS::world_jobs::layout(grid, plantFromX, plantFromY, tile_x, tile_y, plantShape);
         const auto& rules = Core::worldcraft::plantRules();
-        const auto art = cfg.GetUnitGraphicById(rules.growingUnit, "idle_graphic0");
+        const auto kind = Core::InputManager::Get().workKind();
+        const auto art = cfg.GetUnitGraphicById(Core::isEarthwork(kind) ? rules.siteUnit : rules.growingUnit, "idle_graphic0");
+        const Core::PlantLayoutCommand plan{{}, plantFromX, plantFromY, tile_x, tile_y, plantShape, false, viewer, kind,
+            Core::InputManager::Get().workHeight()};
         const auto* player = ECS::Players::Find(registry, viewer);
         int wood = player != nullptr ? ECS::Players::Stock(*player, Core::ResourceType::Wood) : 0;
         for (const auto& [x, y] : tiles) {
-            const bool clear = ECS::world_jobs::canPlant(registry, grid, viewer, x, y) && wood >= rules.woodCost;
-            if (clear) wood -= rules.woodCost;
-            add(art.slp_id, 0, static_cast<float>(x), static_cast<float>(y), clear, false);
+            const int levels = ECS::world_jobs::layoutLevels(plan, x, y);
+            const bool allowed = Core::isEarthwork(kind) ? ECS::earthworks::canWork(registry, grid, viewer, x, y, kind, levels) :
+                ECS::world_jobs::canPlant(registry, grid, viewer, x, y);
+            const int steps = Core::isEarthwork(kind) ?
+                std::max(1, std::abs(ECS::earthworks::targetLevel(grid.GetTile(x, y), kind, levels) - grid.GetTile(x, y).elevation)) : 1;
+            const int cost = Core::worldcraft::workRules(kind).woodCost * steps;
+            const bool clear = allowed && wood >= cost;
+            if (clear) wood -= cost;
+            if (Core::isEarthwork(kind)) {
+                Piece piece;
+                piece.wx = static_cast<float>(x); piece.wy = static_cast<float>(y);
+                piece.earthworkKind = kind; piece.clear = clear;
+                pieces.push_back(piece);
+            } else add(art.slp_id, 0, static_cast<float>(x), static_cast<float>(y), clear, false);
         }
-        if (tiles.empty()) add(art.slp_id, 0, static_cast<float>(tile_x), static_cast<float>(tile_y), false, false);
+        if (tiles.empty() && Core::isEarthwork(kind)) {
+            Piece piece;
+            piece.wx = static_cast<float>(tile_x); piece.wy = static_cast<float>(tile_y); piece.earthworkKind = kind;
+            pieces.push_back(piece);
+        } else if (tiles.empty()) add(art.slp_id, 0, static_cast<float>(tile_x), static_cast<float>(tile_y), false, false);
+        if (Core::isEarthwork(kind) && plantFromX == tile_x && plantFromY == tile_y) {
+            outline.shown = true;
+            outline.wx = static_cast<float>(tile_x); outline.wy = static_cast<float>(tile_y);
+            outline.rx = outline.ry = static_cast<float>(ECS::earthworks::radius(kind, plan.height)) + 0.5f;
+            outline.clear = !pieces.empty() && pieces.front().clear;
+        }
     } else if (ECS::Walls::IsWall(button_id) || ECS::Walls::IsGate(button_id)) {
         // A wall is previewed segment by segment along the line being dragged,
         // each the piece the line gives it and each checked on its own; a gate

@@ -1,4 +1,6 @@
-#include "Grid.h"
+﻿#include "Grid.h"
+
+#include <algorithm>
 
 namespace Physics {
 
@@ -29,7 +31,8 @@ void Grid::SetWalkable(int x, int y, bool walkable) {
 
 bool Grid::IsBlocked(int x, int y) const {
     if (!InBounds(x, y)) return true;
-    return tiles[static_cast<size_t>(y * width + x)].blocked;
+    const auto& tile = tiles[static_cast<size_t>(y * width + x)];
+    return tile.blocked || tile.earthBlocked;
 }
 
 void Grid::SetLandPassability(const std::vector<bool>& by_terrain) {
@@ -113,14 +116,14 @@ bool Grid::GateOpensFor(int x, int y, Core::PlayerId player) const {
     if (!InBounds(x, y) || player == 0) return false;
     const Tile& tile = tiles[static_cast<size_t>(y * width + x)];
     if (tile.gate == 0 || (tile.gate & kGateLocked) != 0) return false;
-    if (!LandPassable(tile.terrain)) return false;
+    if (tile.earthBlocked || !LandPassable(tile.terrain)) return false;
     const Core::PlayerId owner = static_cast<Core::PlayerId>(tile.gate & kGateOwnerBits);
     return owner == player || ((gate_friends[owner] >> player) & 1u) != 0;
 }
 
 uint8_t Grid::LayerBits(const Tile& tile) const {
     uint8_t bits = 0;
-    if (tile.blocked) return bits;
+    if (tile.blocked || tile.earthBlocked) return bits;
     for (int l = 1; l < layer_count; ++l) {
         if (GroundPasses(static_cast<Layer>(l), tile.terrain)) bits |= static_cast<uint8_t>(1u << l);
     }
@@ -139,7 +142,7 @@ void Grid::StoreBits(Tile& tile, uint8_t bits) {
 void Grid::Refresh(int x, int y) {
     if (!InBounds(x, y)) return;
     Tile& tile = tiles[static_cast<size_t>(y * width + x)];
-    const bool walkable = !tile.blocked && LandPassable(tile.terrain);
+    const bool walkable = !tile.blocked && !tile.earthBlocked && LandPassable(tile.terrain);
     if (walkable != tile.is_walkable) ++walk_revision[kLand];
     tile.is_walkable = walkable;
     StoreBits(tile, LayerBits(tile));
@@ -147,6 +150,15 @@ void Grid::Refresh(int x, int y) {
 
 bool Grid::RestoreTiles(const std::vector<Tile>& saved) {
     if (saved.size() != tiles.size()) return false;
+    for (const auto& tile : saved)
+        if (tile.elevation < earthworkMinLevel || tile.elevation > 255 ||
+            tile.terrain >= Core::TerrainType::COUNT || tile.originalTerrain >= Core::TerrainType::COUNT ||
+            tile.earthwork > Earthwork::Lake || tile.pinnedCorners > 15 ||
+            (tile.earthwork != Earthwork::None && (tile.elevation > earthworkMaxLevel ||
+                tile.originalElevation < earthworkMinLevel || tile.originalElevation > earthworkMaxLevel))) return false;
+    for (const auto& tile : saved)
+        for (const auto corner : tile.cornerHeights)
+            if (corner < earthworkMinLevel * 4 || corner > 255 * 4) return false;
     tiles = saved;
     // Everything that keeps something of the ground looks at it again.
     terrain_log.clear();
@@ -166,16 +178,107 @@ void Grid::SetTerrain(int x, int y, Core::TerrainType terrain) {
     Tile& tile = tiles[static_cast<size_t>(y * width + x)];
     if (tile.terrain == terrain) return;
     tile.terrain = terrain;
-    const bool walkable = !tile.blocked && LandPassable(terrain);
+    const bool walkable = !tile.blocked && !tile.earthBlocked && LandPassable(terrain);
     if (walkable != tile.is_walkable) ++walk_revision[kLand];
     tile.is_walkable = walkable;
     StoreBits(tile, LayerBits(tile));
+    LogTerrain(x, y);
+}
+
+void Grid::LogTerrain(int x, int y)
+{
     ++terrain_revision;
     if (terrain_log.size() >= kTerrainLogSize) {
         terrain_log.erase(terrain_log.begin(),
                           terrain_log.begin() + static_cast<long>(kTerrainLogSize / 2));
     }
     terrain_log.push_back(TerrainChange{terrain_revision, x, y});
+}
+
+int Grid::CornerHeight(int x, int y) const
+{
+    int sum = 0;
+    for (int dy = 0; dy < 2; ++dy)
+        for (int dx = 0; dx < 2; ++dx)
+        {
+            const int tx = std::clamp(x - 1 + dx, 0, width - 1);
+            const int ty = std::clamp(y - 1 + dy, 0, height - 1);
+            const auto& tile = GetTile(tx, ty);
+            const int corner = (1 - dy) * 2 + 1 - dx;
+            if ((tile.pinnedCorners & (1 << corner)) != 0) return tile.cornerHeights[corner];
+            sum += tile.elevation;
+        }
+    return sum;
+}
+
+void Grid::PinCorners(int x, int y, uint8_t mask)
+{
+    auto& tile = GetTileMut(x, y);
+    for (int corner = 0; corner < 4; ++corner)
+        if ((mask & (1 << corner)) != 0 && (tile.pinnedCorners & (1 << corner)) == 0)
+        {
+            tile.cornerHeights[corner] = static_cast<int16_t>(CornerHeight(x + corner % 2, y + corner / 2));
+            tile.pinnedCorners = static_cast<uint8_t>(tile.pinnedCorners | (1 << corner));
+        }
+}
+
+bool Grid::EarthworkBlocks(int x, int y) const
+{
+    const auto& tile = GetTile(x, y);
+    if (tile.earthwork == Earthwork::Ditch) return true;
+    if (tile.earthwork == Earthwork::Lake || tile.earthwork == Earthwork::Channel) return false;
+    for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
+        {
+            if (!InBounds(x + dx, y + dy)) continue;
+            const auto& other = GetTile(x + dx, y + dy);
+            if (other.earthwork == Earthwork::Ditch) continue;
+            if ((tile.earthwork == Earthwork::Raised || other.earthwork == Earthwork::Raised) &&
+                tile.elevation > other.elevation + 1) return true;
+        }
+    return false;
+}
+
+bool Grid::SetEarthwork(int x, int y, int level, Earthwork kind)
+{
+    if (!InBounds(x, y) || level < earthworkMinLevel || level > earthworkMaxLevel ||
+        kind > Earthwork::Lake) return false;
+    auto& tile = GetTileMut(x, y);
+    if (kind == Earthwork::None)
+    {
+        if (tile.earthwork == Earthwork::None || level != tile.originalElevation) return false;
+        tile.terrain = tile.originalTerrain;
+        tile.originalElevation = 0;
+        tile.originalTerrain = Core::TerrainType::Grass1;
+        tile.pinnedCorners = 0;
+        tile.cornerHeights = {};
+    }
+    else
+    {
+        if (tile.earthwork == kind && tile.elevation == level) return false;
+        const bool wasWater = tile.terrain == Core::TerrainType::DeepWater || tile.terrain == Core::TerrainType::MediumWater ||
+            tile.terrain == Core::TerrainType::ShallowWater || tile.terrain == Core::TerrainType::Swamp;
+        if (tile.earthwork == Earthwork::None)
+        {
+            tile.originalElevation = tile.elevation;
+            tile.originalTerrain = tile.terrain;
+        }
+        if (kind == Earthwork::Ditch) tile.terrain = Core::TerrainType::Dirt2;
+        if (kind == Earthwork::Channel) tile.terrain = Core::TerrainType::Dirt3;
+        if (kind == Earthwork::Lake) tile.terrain = Core::TerrainType::MediumWater;
+        else if (wasWater) tile.terrain = Core::TerrainType::Sand;
+    }
+    tile.elevation = level;
+    tile.earthwork = kind;
+    for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
+            if (InBounds(x + dx, y + dy))
+            {
+                GetTileMut(x + dx, y + dy).earthBlocked = EarthworkBlocks(x + dx, y + dy);
+                Refresh(x + dx, y + dy);
+            }
+    LogTerrain(x, y);
+    return true;
 }
 
 const Tile& Grid::GetTile(int x, int y) const {

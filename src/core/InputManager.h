@@ -74,6 +74,8 @@ public:
         if (isPlantDrag) { fromX = plantFromX; fromY = plantFromY; }
         return true;
     }
+    Core::WorldJobKind workKind() const { return plantKind; }
+    int workHeight() const { return plantHeight; }
 
     // What an order would do to what is under the cursor, which picks the
     // cursor: a sword over an enemy, an axe over a tree.
@@ -140,6 +142,8 @@ private:
     int plantFromX = 0;
     int plantFromY = 0;
     Core::PlantShape plantShape = Core::PlantShape::Line;
+    Core::WorldJobKind plantKind = Core::WorldJobKind::PlantTree;
+    int plantHeight = Core::mountainHeight;
     int wall_from_x = 0;
     int wall_from_y = 0;
 

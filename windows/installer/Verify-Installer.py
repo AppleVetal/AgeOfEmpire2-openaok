@@ -64,7 +64,7 @@ def main():
             raise RuntimeError(f"Installed game check failed: {name} ({process.returncode})")
         print(f"{name}: ok", flush=True)
 
-    checks = ["worldjobs", "forestnet", "compatibility", "help", "save", "recording", "net", "lobby"]
+    checks = ["earthworks", "earthnet", "worldjobs", "forestnet", "compatibility", "help", "save", "recording", "net", "lobby"]
     check_env = dict(env, AOE_VERIFY_ONLY=",".join(checks))
     game("installed-verification", ["--verify", "10"], check_env)
     verdicts = (work / "installed-verification.stdout.log").read_text(encoding="utf-8", errors="replace").splitlines()

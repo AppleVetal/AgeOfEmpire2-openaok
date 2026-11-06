@@ -1171,4 +1171,11 @@ if [ "$WORLDJOBS" != "worldjobs=ok" ] || [ "$FORESTNET" != "forestnet=ok" ]; the
     STATUS=1
 fi
 
+EARTHWORKS=$(echo "$OUTPUT" | grep '^earthworks=')
+EARTHNET=$(echo "$OUTPUT" | grep '^earthnet=')
+if [ "$EARTHWORKS" != "earthworks=ok" ] || [ "$EARTHNET" != "earthnet=ok" ]; then
+    echo "EARTHWORKS FAILED: $EARTHWORKS; $EARTHNET" >&2
+    STATUS=1
+fi
+
 exit $STATUS

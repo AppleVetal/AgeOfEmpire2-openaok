@@ -1,7 +1,9 @@
-#pragma once
+﻿#pragma once
 #include <utility>
 
 #include "physics/Grid.h"
+
+namespace ECS { class Simulation; }
 
 // The shape of the ground, as it is drawn.
 //
@@ -11,6 +13,10 @@
 // rather than in steps. Terrain, fog, units and the mouse all go through
 // here, so nothing drawn on a hillside floats off it or sinks into it.
 namespace Rendering::Ground {
+
+// A rendering-only snapshot: hidden terrain and heights stay as last seen.
+const Physics::Grid& SeenGrid(const ECS::Simulation& sim, Core::PlayerId viewer = Core::LocalPlayer());
+uint32_t SeenRevision();
 
 // Screen pixels per elevation level.
 constexpr float kLevelPx = 12.0f;

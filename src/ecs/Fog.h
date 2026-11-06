@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <vector>
 
@@ -29,9 +29,13 @@
 // player at this machine's.
 namespace ECS::Fog {
 
+// Запоминает тип и высоту клетки, изменившейся вне видимости игрока.
 struct Ground {
     int32_t tile = 0;                   // y * width + x
     Core::TerrainType terrain{};        // as the player last saw it
+    int32_t elevation = 0;
+    uint8_t pinnedCorners = 0;
+    std::array<int16_t, 4> cornerHeights{};
 };
 
 struct Memory {
@@ -54,11 +58,12 @@ void Going(entt::registry& registry, entt::entity thing);
 
 // A building is about to lay new terrain on the tile: each player who has
 // explored it and does not see it remembers it as `was`.
-void GroundChanging(entt::registry& registry, int x, int y, Core::TerrainType was);
+void GroundChanging(entt::registry& registry, int x, int y, const Physics::Tile& was);
 
 // The terrain `viewer` sees on the tile: what it remembers, or `now`.
 Core::TerrainType GroundSeen(const entt::registry& registry, Core::PlayerId viewer, int x, int y,
                              Core::TerrainType now);
+int ElevationSeen(const entt::registry& registry, Core::PlayerId viewer, int x, int y, int now);
 
 // The memory; null if the world was built without one.
 const Memory* Read(const entt::registry& registry);

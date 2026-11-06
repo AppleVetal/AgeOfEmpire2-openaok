@@ -42,22 +42,34 @@ PowerShell (выполнять только для нового клона, не
   .\Play-OpenAoK.cmd
 
   Исполняемый файл запускается из OpenAoK-source\build. Соседняя папка
-  OpenAoK-source\mods\worldcraft обязательна. В текущие upstream-упаковщики
-  Android/iOS/Switch/Windows отдельная доставка этого пакета ещё не добавлена;
-  для данной контрольной точки проверен запуск Windows из дерева исходников.
+  OpenAoK-source\mods\worldcraft обязательна. Установщик Windows с игровыми
+  данными и дополнением собирается по windows/installer/README.txt; на игровом
+  компьютере средства разработки не нужны. Доставка дополнения через
+  upstream-упаковщики Android/iOS/Switch пока не добавлена.
 
 Проверки
   python OpenAoK-build-support\Verify-Worldcraft.py
+  python OpenAoK-source\local-support\Verify-Earthworks.py
   python OpenAoK-build-support\Verify-Baseline.py
   python OpenAoK-build-support\Capture-Worldcraft-Network.py
 
   Verify-Worldcraft.py проверяет посадку, сеть, сохранения и повторы и создаёт
   демонстрационные сохранения в OpenAoK-build-support\captures\worldcraft.
+  Verify-Earthworks.py проверяет земляные работы вместе с лесом, сетью,
+  сохранениями, повторами и туманом войны. Сохранения трёх высот горы, рва, озера и очереди
+  остаются в OpenAoK-build-support\captures\earthworks. Параметр --only
+  позволяет выбрать сценарии, например --only earthworks,earthnet.
   Verify-Baseline.py возвращает ненулевой код, пока сохраняются три известные
   ошибки, перечисленные в CHECKPOINT.txt. Это не скрывается и не ослабляет пороги.
   Capture-Worldcraft.py проверяет окно игры; дополнительные параметры передаются
   движку. Пример предпросмотра области:
 
   python OpenAoK-build-support\Capture-Worldcraft.py area-preview --reveal all --clicks "97,686;down:620,300;move:620,372"
+
+  Аналогичная проверка кнопки горы и её области при панели 1366x768:
+  python OpenAoK-source\local-support\Capture-Earthworks.py mountain-preview --reveal all --clicks "179,686;220,645;down:800,280;move:800,350"
+
+  Для высокой горы после открытия панели нажмите третью кнопку первого ряда:
+  python OpenAoK-source\local-support\Capture-Earthworks.py high-preview --reveal all --clicks "179,686;138,645;220,645;move:800,280"
 
   Скрипты создают локальные журналы и снимки. В Git их добавлять не нужно.

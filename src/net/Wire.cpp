@@ -97,11 +97,14 @@ void Put(Writer& out, const C& c) {
     } else if constexpr (std::is_same_v<T, Core::WorldJobCommand>) {
         Units(out, c.workers); out.U8(static_cast<uint8_t>(c.kind));
         out.I32(c.tileX); out.I32(c.tileY); out.U8(c.append ? 1 : 0);
+        out.U8(static_cast<uint8_t>(c.height));
     } else if constexpr (std::is_same_v<T, Core::CancelWorldJobCommand>) {
         out.Entity(c.site);
     } else if constexpr (std::is_same_v<T, Core::PlantLayoutCommand>) {
         Units(out, c.workers); out.I32(c.fromX); out.I32(c.fromY); out.I32(c.toX); out.I32(c.toY);
         out.U8(static_cast<uint8_t>(c.shape)); out.U8(c.append ? 1 : 0);
+        out.U8(static_cast<uint8_t>(c.kind));
+        out.U8(static_cast<uint8_t>(c.height));
     } else if constexpr (std::is_same_v<T, Core::BuildCommand>) {
         out.Entity(c.worker); out.I32(c.unit_id); out.I32(c.target_x); out.I32(c.target_y);
     } else if constexpr (std::is_same_v<T, Core::DeleteCommand>) {
@@ -204,14 +207,18 @@ T Take(Reader& in) {
         c.workers = Units(in); c.kind = static_cast<Core::WorldJobKind>(in.U8());
         c.tileX = in.I32(); c.tileY = in.I32();
         const auto append = in.U8(); c.append = append != 0;
-        if (append > 1 || c.kind != Core::WorldJobKind::PlantTree) in.ok = false;
+        c.height = in.U8();
+        if (append > 1 || !Core::isWorldJobKind(c.kind) || !Core::isMountainHeight(c.height)) in.ok = false;
     } else if constexpr (std::is_same_v<T, Core::CancelWorldJobCommand>) {
         c.site = in.Entity();
     } else if constexpr (std::is_same_v<T, Core::PlantLayoutCommand>) {
         c.workers = Units(in); c.fromX = in.I32(); c.fromY = in.I32(); c.toX = in.I32(); c.toY = in.I32();
         c.shape = static_cast<Core::PlantShape>(in.U8());
         const auto append = in.U8(); c.append = append != 0;
-        if (append > 1 || (c.shape != Core::PlantShape::Line && c.shape != Core::PlantShape::Area)) in.ok = false;
+        c.kind = static_cast<Core::WorldJobKind>(in.U8());
+        c.height = in.U8();
+        if (append > 1 || !Core::isWorldJobKind(c.kind) || !Core::isMountainHeight(c.height) ||
+            (c.shape != Core::PlantShape::Line && c.shape != Core::PlantShape::Area)) in.ok = false;
     } else if constexpr (std::is_same_v<T, Core::BuildCommand>) {
         c.worker = in.Entity(); c.unit_id = in.I32(); c.target_x = in.I32(); c.target_y = in.I32();
     } else if constexpr (std::is_same_v<T, Core::DeleteCommand>) {

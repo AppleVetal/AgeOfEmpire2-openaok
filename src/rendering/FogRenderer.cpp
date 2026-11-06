@@ -1,4 +1,4 @@
-#include "FogRenderer.h"
+﻿#include "FogRenderer.h"
 
 #include <algorithm>
 #include <cmath>
@@ -246,7 +246,7 @@ void FogRenderer::Draw(ECS::Simulation& sim, Renderer& renderer, SDL_Renderer* s
     if (!g.tried) Init(sdl_r);
     if (!g.atlas) return;
     const Core::PlayerId viewer = Core::LocalPlayer();
-    const auto& grid = sim.GetGrid();
+    const auto& grid = Ground::SeenGrid(sim);
     const int w = map->width;
     const int h = map->height;
     // With the map revealed nothing is unexplored, so no black edge either,
@@ -341,8 +341,8 @@ void FogRenderer::Draw(ECS::Simulation& sim, Renderer& renderer, SDL_Renderer* s
             const float sy = (static_cast<float>(x) + static_cast<float>(y)) *
                              (Core::IsometricMath::TILE_HEIGHT / 2.0f);
             // Up to eight levels of hill can lift a tile into view.
-            if (sx + 50.0f < cx || sx - 50.0f > view_x1 || sy + 26.0f < cy ||
-                sy - 26.0f - 8.0f * Ground::kLevelPx > view_y1) {
+            if (sx + 50.0f < cx || sx - 50.0f > view_x1 || sy + 26.0f + 4.0f * Ground::kLevelPx < cy ||
+                sy - 26.0f - Physics::earthworkMaxLevel * Ground::kLevelPx > view_y1) {
                 continue;
             }
             const uint8_t s = state(x, y);
@@ -375,8 +375,8 @@ void FogRenderer::Draw(ECS::Simulation& sim, Renderer& renderer, SDL_Renderer* s
                 const float sx = (static_cast<float>(x) - static_cast<float>(y)) * half_w;
                 const float sy = (static_cast<float>(x) + static_cast<float>(y)) *
                                  (Core::IsometricMath::TILE_HEIGHT / 2.0f);
-                if (sx + 50.0f < cx || sx - 50.0f > view_x1 || sy + 26.0f < cy ||
-                    sy - 26.0f - 8.0f * Ground::kLevelPx > view_y1) {
+                if (sx + 50.0f < cx || sx - 50.0f > view_x1 || sy + 26.0f + 4.0f * Ground::kLevelPx < cy ||
+                    sy - 26.0f - Physics::earthworkMaxLevel * Ground::kLevelPx > view_y1) {
                     continue;
                 }
                 AddTile(g.black_vertices, g.black_indices, grid, x, y, kWholeTile, cx, cy, zoom);

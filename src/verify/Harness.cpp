@@ -25,6 +25,8 @@ int Run(int ticks) {
     };
     bool ok = true;
     if (runs("worldjobs")) ok &= CheckWorldJobs();
+    if (runs("earthworks")) ok &= CheckEarthworks();
+    if (runs("earthnet")) ok &= CheckEarthworksNetwork();
     if (runs("forestnet")) ok &= CheckForestNetwork();
     if (runs("compatibility")) ok &= CheckCompatibility();
     if (runs("entities")) ok &= CheckDeterminism(ticks);

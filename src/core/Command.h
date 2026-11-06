@@ -372,7 +372,26 @@ struct DisbandCommand {
     PlayerId player;
 };
 
-enum class WorldJobKind : uint8_t { PlantTree = 1 };
+enum class WorldJobKind : uint8_t { PlantTree = 1, RaiseGround, DigDitch, RestoreGround, DigChannel, DigLake };
+
+constexpr int hillHeight = 4;
+constexpr int mountainHeight = 12;
+constexpr int highMountainHeight = 18;
+constexpr bool isMountainHeight(int height)
+{
+  return height == hillHeight || height == mountainHeight || height == highMountainHeight;
+}
+
+constexpr bool isEarthwork(WorldJobKind kind)
+{
+  return kind == WorldJobKind::RaiseGround || kind == WorldJobKind::DigDitch ||
+    kind == WorldJobKind::RestoreGround || kind == WorldJobKind::DigChannel || kind == WorldJobKind::DigLake;
+}
+
+constexpr bool isWorldJobKind(WorldJobKind kind)
+{
+  return kind == WorldJobKind::PlantTree || isEarthwork(kind);
+}
 
 // Передаёт приказ группе жителей выполнить или поставить в очередь работу на клетке.
 struct WorldJobCommand
@@ -383,6 +402,7 @@ struct WorldJobCommand
   int32_t tileY = 0;
   bool append = false;
   PlayerId player = PLAYER_NONE;
+  int32_t height = mountainHeight;
 };
 
 // Отменяет принадлежащий игроку участок работы с возвратом остатка стоимости.
@@ -405,6 +425,8 @@ struct PlantLayoutCommand
   PlantShape shape = PlantShape::Line;
   bool append = false;
   PlayerId player = PLAYER_NONE;
+  WorldJobKind kind = WorldJobKind::PlantTree;
+  int32_t height = mountainHeight;
 };
 
 using Command = std::variant<MoveCommand, GatherCommand, AttackCommand,

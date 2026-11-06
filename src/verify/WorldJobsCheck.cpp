@@ -18,6 +18,7 @@
 #include "ecs/Simulation.h"
 #include "ecs/Vision.h"
 #include "ecs/WorldJobs.h"
+#include "ecs/Earthworks.h"
 #include "ecs/components/Health.h"
 #include "ecs/components/Owner.h"
 #include "ecs/components/Resource.h"
@@ -57,7 +58,8 @@ namespace Verify
       return result;
     }
 
-    bool patch(ECS::Simulation& sim, Core::PlayerId player, int width, int height, int& x, int& y)
+    bool patch(ECS::Simulation& sim, Core::PlayerId player, int width, int height, int& x, int& y,
+      Core::WorldJobKind kind = Core::WorldJobKind::PlantTree)
     {
       const auto crew = workers(sim, player);
       if (crew.empty()) return false;
@@ -71,7 +73,8 @@ namespace Verify
             bool hasRoom = true;
             for (int row = 0; row < height && hasRoom; ++row)
               for (int col = 0; col < width && hasRoom; ++col)
-                hasRoom = ECS::world_jobs::canPlant(sim.GetRegistry(), sim.GetGrid(), player,
+                hasRoom = Core::isEarthwork(kind) ? ECS::earthworks::canWork(sim.GetRegistry(), sim.GetGrid(), player,
+                    cx + dx + col, cy + dy + row, kind) : ECS::world_jobs::canPlant(sim.GetRegistry(), sim.GetGrid(), player,
                     cx + dx + col, cy + dy + row);
             if (hasRoom) { x = cx + dx; y = cy + dy; return true; }
           }
@@ -354,7 +357,7 @@ namespace Verify
       ~Pair() { Net::Leave(client); Net::Leave(host); }
     };
 
-    const char* network()
+    const char* network(bool hasEarthworks = false)
     {
       Pair pair;
       if (!Net::Host(pair.host, 0, setup(), 2) ||
@@ -369,13 +372,17 @@ namespace Verify
       ECS::Simulation host, client;
       host.Init(pair.host.setup); client.Init(pair.client.setup);
       int x = 0, y = 0, cx = 0, cy = 0;
-      if (!patch(host, 1, 3, 1, x, y) || !patch(host, 2, 2, 2, cx, cy)) return "no network planting sites";
+      const auto hostKind = hasEarthworks ? Core::WorldJobKind::RaiseGround : Core::WorldJobKind::PlantTree;
+      const auto clientKind = hasEarthworks ? Core::WorldJobKind::DigDitch : Core::WorldJobKind::PlantTree;
+      if (!patch(host, 1, 3, 1, x, y, hostKind) || !patch(host, 2, 2, 2, cx, cy, clientKind)) return "no network work sites";
+      int peaks[3]{};
+      for (int i = 0; i < 3; ++i) peaks[i] = host.GetGrid().GetTile(x + i, y).elevation + Core::mountainHeight;
       Net::Issue(pair.host, Core::PlantLayoutCommand{workers(host, 1), x, y, x + 2, y,
-        Core::PlantShape::Line, false, 1});
+        Core::PlantShape::Line, false, 1, hostKind});
       Net::Issue(pair.client, Core::PlantLayoutCommand{workers(host, 2), cx, cy, cx + 1, cy + 1,
-        Core::PlantShape::Area, false, 2});
-      constexpr uint64_t ticks = 10000;
-      const auto advance = [](Net::Session& session, ECS::Simulation& sim)
+        Core::PlantShape::Area, false, 2, clientKind});
+      const uint64_t ticks = hasEarthworks ? 30000 : 10000;
+      const auto advance = [ticks](Net::Session& session, ECS::Simulation& sim)
       {
         std::vector<Core::Command> due;
         for (int i = 0; i < Net::kTicksPerTurn && sim.Tick() < ticks && Net::NextTick(session, due); ++i)
@@ -394,11 +401,20 @@ namespace Verify
         std::this_thread::sleep_for(std::chrono::microseconds(100));
       }
       if (host.Tick() != ticks || client.Tick() != ticks) return "planting lockstep stalled";
-      if (treeCount(host.GetRegistry()) != 7 || ECS::Digest::Of(host) != ECS::Digest::Of(client))
+      const int completed = hasEarthworks ? static_cast<int>(std::count_if(host.GetGrid().Tiles().begin(), host.GetGrid().Tiles().end(),
+        [](const Physics::Tile& tile) { return tile.earthwork != Physics::Earthwork::None; })) : treeCount(host.GetRegistry());
+      bool finished = hasEarthworks ? completed >= 7 : completed == 7;
+      if (hasEarthworks) {
+        for (int i = 0; i < 3; ++i) finished = finished && host.GetGrid().GetTile(x + i, y).elevation >= peaks[i];
+        for (int row = 0; row < 2; ++row)
+          for (int col = 0; col < 2; ++col) finished = finished && host.GetGrid().GetTile(cx + col, cy + row).earthwork == Physics::Earthwork::Ditch;
+        finished = finished && host.GetRegistry().view<c::WorldJob>().empty();
+      }
+      if (!finished || ECS::Digest::Of(host) != ECS::Digest::Of(client))
       {
         std::printf("  network planted=%d,%d sites=%zu,%zu\n", treeCount(host.GetRegistry()), treeCount(client.GetRegistry()),
           host.GetRegistry().view<c::WorldJob>().size(), client.GetRegistry().view<c::WorldJob>().size());
-        return "network line and area did not create identical forests";
+        return "network line and area did not finish identical work";
       }
       return nullptr;
     }
@@ -419,6 +435,14 @@ namespace Verify
     const char* failure = network();
     Core::CommandQueue::Get().PopAllCommands();
     std::printf("forestnet=%s\n", failure != nullptr ? failure : "ok");
+    return failure == nullptr;
+  }
+
+  bool CheckEarthworksNetwork()
+  {
+    const char* failure = network(true);
+    Core::CommandQueue::Get().PopAllCommands();
+    std::printf("earthnet=%s\n", failure != nullptr ? failure : "ok");
     return failure == nullptr;
   }
 }

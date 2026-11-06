@@ -20,6 +20,9 @@ namespace ECS::Components
     Core::Fixed32 workedMs{};
     int32_t growthLeftMs = 0;
     bool hasBlocked = false;
+    int32_t targetElevation = 0;
+    int32_t rise = 1;
+    int32_t clearanceWaitMs = 0;
   };
 
   constexpr std::size_t worldJobQueueLimit = 256;

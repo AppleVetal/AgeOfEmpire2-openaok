@@ -211,7 +211,7 @@ void InputManager::GivePendingOrder(ECS::Simulation& sim, float x, float y) {
         const int tileX = Physics::TileOf(Fixed32(x)), tileY = Physics::TileOf(Fixed32(y));
         CommandQueue::Get().PushCommand(PlantLayoutCommand{units,
             isPlantDrag ? plantFromX : tileX, isPlantDrag ? plantFromY : tileY,
-            tileX, tileY, plantShape, append, Core::LocalPlayer()});
+            tileX, tileY, plantShape, append, Core::LocalPlayer(), plantKind, plantHeight});
         isPlantDrag = false;
         if (append) pending_order = PendingOrder::PlantTree;
         return;
@@ -783,7 +783,7 @@ void InputManager::UpdateIntent(ECS::Simulation& sim, Rendering::Renderer& rende
     auto& registry = sim.GetRegistry();
     // The pointer in the world's unzoomed pixels, as a click takes it.
     const float zoom = renderer.camera_zoom > 0.0f ? renderer.camera_zoom : 1.0f;
-    const auto wc = Rendering::Ground::Pick(sim.GetGrid(), renderer.camera_x + static_cast<float>(mx) / zoom,
+    const auto wc = Rendering::Ground::Pick(Rendering::Ground::SeenGrid(sim), renderer.camera_x + static_cast<float>(mx) / zoom,
                                             renderer.camera_y + static_cast<float>(my) / zoom);
     const float x = static_cast<float>(wc.first);
     const float y = static_cast<float>(wc.second);
@@ -1155,8 +1155,11 @@ void InputManager::RunCommand(ECS::Simulation& sim, const Rendering::UIRenderer:
         pending_order = PendingOrder::Repair;
         break;
     case Rendering::UIRenderer::Action::PlantTree:
+    case Rendering::UIRenderer::Action::Earthwork:
         pending_order = PendingOrder::PlantTree;
         plantShape = static_cast<Core::PlantShape>(cmd.choice);
+        plantKind = cmd.jobKind;
+        plantHeight = cmd.height;
         isPlantDrag = false;
         break;
     case Rendering::UIRenderer::Action::CancelPlanting: {
@@ -1585,7 +1588,7 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
 
             // A standing order waiting for its target takes this click.
             if (pending_order != PendingOrder::None) {
-                const auto wc = Rendering::Ground::Pick(sim.GetGrid(), ax + cam_x, ay + cam_y);
+                const auto wc = Rendering::Ground::Pick(Rendering::Ground::SeenGrid(sim), ax + cam_x, ay + cam_y);
                 if (pending_order == PendingOrder::PlantTree) {
                     isPlantDrag = true;
                     plantFromX = Physics::TileOf(Fixed32(wc.first));
@@ -1599,7 +1602,7 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
             // With a building chosen from the build menu, the next click on the
             // world places it.
             if (placing_building) {
-                const auto wc = Rendering::Ground::Pick(sim.GetGrid(), ax + cam_x, ay + cam_y);
+                const auto wc = Rendering::Ground::Pick(Rendering::Ground::SeenGrid(sim), ax + cam_x, ay + cam_y);
                 // The tile under the cursor: tiles are centred on whole
                 // numbers. Anything but a wall goes down with its middle there.
                 int gx = static_cast<int>(std::floor(wc.first + 0.5));
@@ -1654,7 +1657,7 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
             drag_screen_y = event.button.y;
         }
         else if (event.button.button == SDL_BUTTON_RIGHT) {
-            auto wc = Rendering::Ground::Pick(sim.GetGrid(), ax + cam_x, ay + cam_y);
+            auto wc = Rendering::Ground::Pick(Rendering::Ground::SeenGrid(sim), ax + cam_x, ay + cam_y);
             // On the mini-map, an order goes to the point of the map it shows:
             // the selected units move to it (with Shift, a waypoint), a
             // building's gather point goes there. Nothing is picked as a target.
@@ -2159,7 +2162,7 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
     }
     else if (event.type == SDL_MOUSEBUTTONUP) {
         if (event.button.button == SDL_BUTTON_LEFT && isPlantDrag) {
-            const auto wc = Rendering::Ground::Pick(sim.GetGrid(),
+            const auto wc = Rendering::Ground::Pick(Rendering::Ground::SeenGrid(sim),
                 cam_x + static_cast<float>(event.button.x) / zoom,
                 cam_y + static_cast<float>(event.button.y) / zoom);
             GivePendingOrder(sim, wc.first, wc.second);
@@ -2180,7 +2183,7 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
             wall_drag = false;
             placing_building = false;
             const auto wc = Rendering::Ground::Pick(
-                sim.GetGrid(), static_cast<float>(event.button.x) / zoom + cam_x,
+                Rendering::Ground::SeenGrid(sim), static_cast<float>(event.button.x) / zoom + cam_x,
                 static_cast<float>(event.button.y) / zoom + cam_y);
             const int gx = static_cast<int>(std::floor(wc.first + 0.5));
             const int gy = static_cast<int>(std::floor(wc.second + 0.5));
@@ -2220,7 +2223,7 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
                 // pointer, or else the nearest building or object on the
                 // ground there, and among equals the frontmost. Units are
                 // found only by their art.
-                const auto wc = Rendering::Ground::Pick(sim.GetGrid(), dex + cam_x, dey + cam_y);
+                const auto wc = Rendering::Ground::Pick(Rendering::Ground::SeenGrid(sim), dex + cam_x, dey + cam_y);
                 entt::entity best = entt::null;
                 float best_dist = 0.0f;
                 float best_depth = 0.0f;
@@ -2346,7 +2349,7 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
                     const float asx = sp.x - cam_x;
                     // Where it is drawn: on a hill, higher up the screen.
                     const float asy = sp.y - cam_y -
-                        Rendering::Ground::HeightPx(sim.GetGrid(), t.position.x.ToFloat(),
+                        Rendering::Ground::HeightPx(Rendering::Ground::SeenGrid(sim), t.position.x.ToFloat(),
                                                     t.position.y.ToFloat());
                     if (asx < x1 || asx > x2 || asy < y1 || asy > y2) continue;
                     (registry.all_of<ECS::Components::Building>(e) ? buildings : units).push_back(e);

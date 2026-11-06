@@ -12,7 +12,7 @@ namespace Save {
 
 namespace {
 
-constexpr char kMagic[8] = {'A', 'O', 'K', 'C', 'R', 'E', 'C', '4'};
+constexpr char kMagic[8] = {'A', 'O', 'K', 'C', 'R', 'E', 'C', '6'};
 
 } // namespace
 

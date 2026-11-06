@@ -23,7 +23,7 @@ namespace Net {
 // The game's port, for its connections and for finding games.
 constexpr uint16_t kPort = 27015;
 // The lobby's language: machines speaking another cannot play together.
-constexpr uint8_t kVersion = 6;
+constexpr uint8_t kVersion = 8;
 // A client's hello: kVersion, engine/data identity and its name. A host puts
 // out an incompatible client with kEject and kWrongVersion, in the
 // lobby and in a game started from the command line alike.

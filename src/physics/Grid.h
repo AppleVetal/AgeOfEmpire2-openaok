@@ -1,5 +1,6 @@
-#pragma once
+﻿#pragma once
 #include <vector>
+#include <array>
 #include <cstdint>
 #include "core/FixedPoint.h"
 #include "core/Types.h"
@@ -50,6 +51,11 @@ constexpr uint8_t kGateLocked = 0x80;
 // on (grass and beach let land units on, water does not), and nothing stands
 // on it. They are stored apart because they change apart: a felled tree frees
 // its tile; a dock stands on water.
+enum class Earthwork : uint8_t { None, Raised, Ditch, Channel, Lake };
+constexpr int earthworkMinLevel = -4;
+constexpr int earthworkMaxLevel = 24;
+
+// Хранит грунт, высоту, препятствия и исходный рельеф изменённой клетки.
 struct Tile {
     Core::TerrainType terrain = Core::TerrainType::Grass1;
     int elevation = 0;
@@ -65,6 +71,12 @@ struct Tile {
     // The tile is blocked like any building's; a keyed land layer finds it
     // open when the gate opens for that key.
     uint8_t gate = 0;
+    Earthwork earthwork = Earthwork::None;
+    int originalElevation = 0;
+    Core::TerrainType originalTerrain = Core::TerrainType::Grass1;
+    bool earthBlocked = false;
+    uint8_t pinnedCorners = 0;
+    std::array<int16_t, 4> cornerHeights{}; // quarter-levels, NW/NE/SW/SE
 };
 
 // One change to a tile's ground during play: a farm planted, a foundation
@@ -75,8 +87,11 @@ struct TerrainChange {
     int y = 0;
 };
 
+// Хранит карту и ревизии её поверхности и проходимости для каждого слоя движения.
 class Grid {
 public:
+    int CornerHeight(int x, int y) const;
+    void PinCorners(int x, int y, uint8_t mask);
     Grid(int width, int height);
     void Resize(int w, int h);
     // Recomputes a tile's passability, for every layer, from its ground and
@@ -131,6 +146,8 @@ public:
     // Changes a tile's ground during play and records it, so whatever has
     // drawn the ground can tell what is out of date without being told.
     void SetTerrain(int x, int y, Core::TerrainType terrain);
+    // Changes height and recomputes the affected slopes, keeping object blocking separate.
+    bool SetEarthwork(int x, int y, int level, Earthwork kind);
     // Bumped by every SetTerrain. Map generation writes tiles directly and
     // leaves it at zero.
     uint32_t TerrainRevision() const { return terrain_revision; }
@@ -166,6 +183,8 @@ private:
     uint8_t LayerBits(const Tile& tile) const;
     // Stores a tile's new layer bits, bumping each layer that changed.
     void StoreBits(Tile& tile, uint8_t bits);
+    void LogTerrain(int x, int y);
+    bool EarthworkBlocks(int x, int y) const;
 
     int width;
     int height;

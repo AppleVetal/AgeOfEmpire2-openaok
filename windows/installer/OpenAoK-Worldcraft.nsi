@@ -17,7 +17,7 @@ SetCompressorDictSize 32
 SetDatablockOptimize on
 ShowInstDetails show
 ShowUninstDetails show
-VIProductVersion "0.1.0.0"
+VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey /LANG=1049 "ProductName" "${APP_NAME}"
 VIAddVersionKey /LANG=1049 "FileDescription" "Установка OpenAoK с дополнением Worldcraft"
 VIAddVersionKey /LANG=1049 "FileVersion" "${APP_VERSION}"
@@ -25,7 +25,7 @@ VIAddVersionKey /LANG=1049 "LegalCopyright" "OpenAoK contributors; game data bel
 
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Установка OpenAoK Worldcraft"
-!define MUI_WELCOMEPAGE_TEXT "Готовая игра с посадкой деревьев жителями: линией и областью.$\r$\n$\r$\nВ комплект включены подготовленные игровые данные. После установки игру можно запускать с ярлыка.$\r$\n$\r$\nWindows 10/11, 64 бита. Средства разработки и доступ в интернет для одиночной игры не требуются."
+!define MUI_WELCOMEPAGE_TEXT "Жители могут выращивать лес, поднимать горы, рыть сухие рвы и восстанавливать землю: линией или областью.$\r$\n$\r$\nИгровые данные включены. После установки запускайте игру с ярлыка.$\r$\n$\r$\nWindows 10/11, 64 бита. Средства разработки и интернет для одиночной игры не требуются."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES

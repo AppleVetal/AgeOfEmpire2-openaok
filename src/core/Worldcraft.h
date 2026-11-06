@@ -2,10 +2,17 @@
 
 #include <filesystem>
 #include <string>
+#include "core/Command.h"
 
 namespace Core::worldcraft
 {
   constexpr int siteLimit = 256;
+  constexpr int workMarkerSlp(WorldJobKind kind) { return -100 - static_cast<int>(kind); }
+  constexpr WorldJobKind workMarkerKind(int slp)
+  {
+    const auto kind = static_cast<WorldJobKind>(-100 - slp);
+    return slp <= -100 && slp >= -106 && isEarthwork(kind) ? kind : static_cast<WorldJobKind>(0);
+  }
   // Хранит проверенные правила посадки и ссылки на графику оригинального комплекта.
   struct PlantRules
   {
@@ -18,9 +25,20 @@ namespace Core::worldcraft
     int buttonIcon = -1;
   };
 
+  // Задаёт стоимость и трудозатраты одного уровня земляных работ.
+  struct WorkRules
+  {
+    int woodCost = 0;
+    int workMs = 0;
+  };
+
   bool load(const std::filesystem::path& root, std::string& error);
   bool validateArt(std::string& error);
   const PlantRules& plantRules();
+  WorkRules workRules(WorldJobKind kind);
+  const std::string& jobName(WorldJobKind kind);
+  const std::string& heightName(int height);
+  std::string earthworkHelp(WorldJobKind kind);
   const std::string& text(const std::string& key);
   std::string plantHelp();
 }
