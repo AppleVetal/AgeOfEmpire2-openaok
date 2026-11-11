@@ -1184,4 +1184,11 @@ if [ "$TREEMAN" != "treeman=ok" ]; then
     STATUS=1
 fi
 
+RIVERS=$(echo "$OUTPUT" | grep '^rivers=')
+RIVERNET=$(echo "$OUTPUT" | grep '^rivernet=')
+if [ "$RIVERS" != "rivers=ok" ] || [ "$RIVERNET" != "rivernet=ok" ]; then
+    echo "RIVERS FAILED: $RIVERS; $RIVERNET" >&2
+    STATUS=1
+fi
+
 exit $STATUS

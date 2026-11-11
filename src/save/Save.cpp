@@ -70,7 +70,7 @@ namespace C = ECS::Components;
 
 constexpr char kMagic[8] = {'A', 'O', 'K', 'C', 'S', 'A', 'V', 'E'};
 // The save format's version; a save of any other version is refused.
-constexpr uint32_t kVersion = 16;
+constexpr uint32_t kVersion = 17;
 
 // Plain data goes out as it lies in memory.
 template <typename T>
@@ -118,6 +118,8 @@ void Get(Reader& r, C::WorldJobQueue& queue) {
 void Get(Reader& r, C::WorldJob& job) {
     GetPod(r, job);
     if (!Core::isWorldJobKind(job.kind) ||
+        job.m_flowDirection > 8 ||
+        (job.kind == Core::WorldJobKind::DigRiver ? job.m_flowDirection == 0 : job.m_flowDirection != 0) ||
         (job.phase != C::WorldJobPhase::Working && job.phase != C::WorldJobPhase::Growing) ||
         job.workMs < 16 || job.workMs > 12000000 || job.workedMs.value < 0 ||
         job.workedMs > Core::Fixed32(job.workMs) || job.paidWood < 0 || job.paidWood > 40000 ||
@@ -827,7 +829,11 @@ bool Read(ECS::Simulation& sim, const std::vector<uint8_t>& in, std::string* err
     GetPods(r, flares.flares);
     registry.ctx().insert_or_assign(std::move(flares));
     ECS::Fog::Memory fog;
-    for (auto& ground : fog.ground) GetPods(r, ground);
+    for (auto& ground : fog.ground)
+    {
+      GetPods(r, ground);
+      for (const auto& tile : ground) if (tile.m_flowDirection > 8) r.ok = false;
+    }
     fog.revision = r.U32();
     registry.ctx().insert_or_assign(std::move(fog));
     ECS::Score::Table score;

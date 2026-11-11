@@ -29,13 +29,14 @@
 // player at this machine's.
 namespace ECS::Fog {
 
-// Запоминает тип и высоту клетки, изменившейся вне видимости игрока.
+// Запоминает тип, высоту и течение клетки, изменившейся вне видимости игрока.
 struct Ground {
     int32_t tile = 0;                   // y * width + x
     Core::TerrainType terrain{};        // as the player last saw it
     int32_t elevation = 0;
     uint8_t pinnedCorners = 0;
     std::array<int16_t, 4> cornerHeights{};
+    uint8_t m_flowDirection = 0;
 };
 
 struct Memory {

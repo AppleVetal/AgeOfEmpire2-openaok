@@ -15,6 +15,8 @@ class Simulation;
 }
 
 namespace Verify {
+bool CheckRivers();
+bool CheckRiversNetwork();
 bool CheckWorldJobs();
 bool CheckEarthworks();
 bool CheckEarthworksNetwork();

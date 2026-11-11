@@ -104,13 +104,13 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
     if (isPlanting) {
         plantFromX = tile_x; plantFromY = tile_y;
         Core::InputManager::Get().planting(plantFromX, plantFromY, plantShape);
-        const auto tiles = ECS::world_jobs::layout(grid, plantFromX, plantFromY, tile_x, tile_y, plantShape);
         const auto& rules = Core::worldcraft::plantRules();
         const auto kind = Core::InputManager::Get().workKind();
         const auto art = cfg.GetUnitGraphicById(kind == Core::WorldJobKind::GrowTreeman ? Core::treeman::unitId :
             Core::isEarthwork(kind) ? rules.siteUnit : rules.growingUnit, "idle_graphic0");
         const Core::PlantLayoutCommand plan{{}, plantFromX, plantFromY, tile_x, tile_y, plantShape, false, viewer, kind,
-            Core::InputManager::Get().workHeight()};
+            Core::InputManager::Get().workHeight(), Core::InputManager::Get().workWidth()};
+        const auto tiles = ECS::world_jobs::layout(grid, plan);
         const auto* player = ECS::Players::Find(registry, viewer);
         int wood = player != nullptr ? ECS::Players::Stock(*player, Core::ResourceType::Wood) : 0;
         int gold = player != nullptr ? ECS::Players::Stock(*player, Core::ResourceType::Gold) : 0;
@@ -139,7 +139,8 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
         if (Core::isEarthwork(kind) && plantFromX == tile_x && plantFromY == tile_y) {
             outline.shown = true;
             outline.wx = static_cast<float>(tile_x); outline.wy = static_cast<float>(tile_y);
-            outline.rx = outline.ry = static_cast<float>(ECS::earthworks::radius(kind, plan.height)) + 0.5f;
+            outline.rx = outline.ry = static_cast<float>(Core::isWaterwork(kind) ? plan.m_width / 2 :
+                ECS::earthworks::radius(kind, plan.height)) + 0.5f;
             outline.clear = !pieces.empty() && pieces.front().clear;
         }
     } else if (ECS::Walls::IsWall(button_id) || ECS::Walls::IsGate(button_id)) {

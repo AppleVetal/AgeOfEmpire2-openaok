@@ -98,6 +98,7 @@ void Put(Writer& out, const C& c) {
         Units(out, c.workers); out.U8(static_cast<uint8_t>(c.kind));
         out.I32(c.tileX); out.I32(c.tileY); out.U8(c.append ? 1 : 0);
         out.U8(static_cast<uint8_t>(c.height));
+        out.U8(c.m_flowDirection);
     } else if constexpr (std::is_same_v<T, Core::CancelWorldJobCommand>) {
         out.Entity(c.site);
     } else if constexpr (std::is_same_v<T, Core::PlantLayoutCommand>) {
@@ -105,6 +106,7 @@ void Put(Writer& out, const C& c) {
         out.U8(static_cast<uint8_t>(c.shape)); out.U8(c.append ? 1 : 0);
         out.U8(static_cast<uint8_t>(c.kind));
         out.U8(static_cast<uint8_t>(c.height));
+        out.U8(static_cast<uint8_t>(c.m_width));
     } else if constexpr (std::is_same_v<T, Core::BuildCommand>) {
         out.Entity(c.worker); out.I32(c.unit_id); out.I32(c.target_x); out.I32(c.target_y);
     } else if constexpr (std::is_same_v<T, Core::DeleteCommand>) {
@@ -208,7 +210,9 @@ T Take(Reader& in) {
         c.tileX = in.I32(); c.tileY = in.I32();
         const auto append = in.U8(); c.append = append != 0;
         c.height = in.U8();
-        if (append > 1 || !Core::isWorldJobKind(c.kind) || !Core::isMountainHeight(c.height)) in.ok = false;
+        c.m_flowDirection = in.U8();
+        if (append > 1 || !Core::isWorldJobKind(c.kind) || !Core::isMountainHeight(c.height) ||
+            c.m_flowDirection > 8 || (c.kind != Core::WorldJobKind::DigRiver && c.m_flowDirection != 0)) in.ok = false;
     } else if constexpr (std::is_same_v<T, Core::CancelWorldJobCommand>) {
         c.site = in.Entity();
     } else if constexpr (std::is_same_v<T, Core::PlantLayoutCommand>) {
@@ -217,7 +221,9 @@ T Take(Reader& in) {
         const auto append = in.U8(); c.append = append != 0;
         c.kind = static_cast<Core::WorldJobKind>(in.U8());
         c.height = in.U8();
+        c.m_width = in.U8();
         if (append > 1 || !Core::isWorldJobKind(c.kind) || !Core::isMountainHeight(c.height) ||
+            !Core::isWaterWidth(c.m_width) || (!Core::isWaterwork(c.kind) && c.m_width != 1) ||
             (c.shape != Core::PlantShape::Line && c.shape != Core::PlantShape::Area)) in.ok = false;
     } else if constexpr (std::is_same_v<T, Core::BuildCommand>) {
         c.worker = in.Entity(); c.unit_id = in.I32(); c.target_x = in.I32(); c.target_y = in.I32();

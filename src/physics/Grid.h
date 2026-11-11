@@ -51,11 +51,11 @@ constexpr uint8_t kGateLocked = 0x80;
 // on (grass and beach let land units on, water does not), and nothing stands
 // on it. They are stored apart because they change apart: a felled tree frees
 // its tile; a dock stands on water.
-enum class Earthwork : uint8_t { None, Raised, Ditch, Channel, Lake };
+enum class Earthwork : uint8_t { None, Raised, Ditch, Channel, Lake, River, WaterMoat };
 constexpr int earthworkMinLevel = -4;
 constexpr int earthworkMaxLevel = 24;
 
-// Хранит грунт, высоту, препятствия и исходный рельеф изменённой клетки.
+// Хранит грунт, высоту, препятствия, направление течения и исходный рельеф клетки.
 struct Tile {
     Core::TerrainType terrain = Core::TerrainType::Grass1;
     int elevation = 0;
@@ -77,6 +77,7 @@ struct Tile {
     bool earthBlocked = false;
     uint8_t pinnedCorners = 0;
     std::array<int16_t, 4> cornerHeights{}; // quarter-levels, NW/NE/SW/SE
+    uint8_t m_flowDirection = 0;
 };
 
 // One change to a tile's ground during play: a farm planted, a foundation
@@ -147,7 +148,7 @@ public:
     // drawn the ground can tell what is out of date without being told.
     void SetTerrain(int x, int y, Core::TerrainType terrain);
     // Changes height and recomputes the affected slopes, keeping object blocking separate.
-    bool SetEarthwork(int x, int y, int level, Earthwork kind);
+    bool SetEarthwork(int x, int y, int level, Earthwork kind, uint8_t flowDirection = 0);
     // Bumped by every SetTerrain. Map generation writes tiles directly and
     // leaves it at zero.
     uint32_t TerrainRevision() const { return terrain_revision; }

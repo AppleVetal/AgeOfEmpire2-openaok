@@ -118,8 +118,10 @@ public:
         PlantTree,
         Earthwork,
         EarthworkHeight,
+        WaterWidth,
         CancelPlanting,
     };
+    // Описывает действие, параметры и отображение кнопки приказа.
     struct Command {
         CommandKind kind = CommandKind::Produce;
         // Its place in the grid, 1 to 15 along the rows.
@@ -135,6 +137,7 @@ public:
         int choice = -1;
         Core::WorldJobKind jobKind = Core::WorldJobKind::PlantTree;
         int height = Core::mountainHeight;
+        int m_width = 1;
         // A number the button shows on its face -- a Market button's price --
         // or -1.
         int label = -1;
@@ -159,6 +162,7 @@ public:
     };
     static constexpr int kCommandSlots = 15;   // a 5x3 grid
     static constexpr int earthworkPage = 100;
+    static constexpr int waterworkPage = 101;
 
     // What clicking a button asks the world to do. Page switches are the
     // interface's own business and never reach here.

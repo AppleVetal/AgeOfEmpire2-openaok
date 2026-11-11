@@ -153,7 +153,8 @@ bool Grid::RestoreTiles(const std::vector<Tile>& saved) {
     for (const auto& tile : saved)
         if (tile.elevation < earthworkMinLevel || tile.elevation > 255 ||
             tile.terrain >= Core::TerrainType::COUNT || tile.originalTerrain >= Core::TerrainType::COUNT ||
-            tile.earthwork > Earthwork::Lake || tile.pinnedCorners > 15 ||
+            tile.earthwork > Earthwork::WaterMoat || tile.pinnedCorners > 15 || tile.m_flowDirection > 8 ||
+            (tile.earthwork == Earthwork::River ? tile.m_flowDirection == 0 : tile.m_flowDirection != 0) ||
             (tile.earthwork != Earthwork::None && (tile.elevation > earthworkMaxLevel ||
                 tile.originalElevation < earthworkMinLevel || tile.originalElevation > earthworkMaxLevel))) return false;
     for (const auto& tile : saved)
@@ -225,8 +226,8 @@ void Grid::PinCorners(int x, int y, uint8_t mask)
 bool Grid::EarthworkBlocks(int x, int y) const
 {
     const auto& tile = GetTile(x, y);
-    if (tile.earthwork == Earthwork::Ditch) return true;
-    if (tile.earthwork == Earthwork::Lake || tile.earthwork == Earthwork::Channel) return false;
+    if (tile.earthwork == Earthwork::Ditch || tile.earthwork == Earthwork::WaterMoat) return true;
+    if (tile.earthwork == Earthwork::Lake || tile.earthwork == Earthwork::Channel || tile.earthwork == Earthwork::River) return false;
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
         {
@@ -239,10 +240,11 @@ bool Grid::EarthworkBlocks(int x, int y) const
     return false;
 }
 
-bool Grid::SetEarthwork(int x, int y, int level, Earthwork kind)
+bool Grid::SetEarthwork(int x, int y, int level, Earthwork kind, uint8_t flowDirection)
 {
     if (!InBounds(x, y) || level < earthworkMinLevel || level > earthworkMaxLevel ||
-        kind > Earthwork::Lake) return false;
+        kind > Earthwork::WaterMoat || flowDirection > 8 || (kind != Earthwork::River && flowDirection != 0)) return false;
+    if (kind == Earthwork::River && flowDirection == 0) flowDirection = 1;
     auto& tile = GetTileMut(x, y);
     if (kind == Earthwork::None)
     {
@@ -255,7 +257,7 @@ bool Grid::SetEarthwork(int x, int y, int level, Earthwork kind)
     }
     else
     {
-        if (tile.earthwork == kind && tile.elevation == level) return false;
+        if (tile.earthwork == kind && tile.elevation == level && tile.m_flowDirection == flowDirection) return false;
         const bool wasWater = tile.terrain == Core::TerrainType::DeepWater || tile.terrain == Core::TerrainType::MediumWater ||
             tile.terrain == Core::TerrainType::ShallowWater || tile.terrain == Core::TerrainType::Swamp;
         if (tile.earthwork == Earthwork::None)
@@ -265,11 +267,13 @@ bool Grid::SetEarthwork(int x, int y, int level, Earthwork kind)
         }
         if (kind == Earthwork::Ditch) tile.terrain = Core::TerrainType::Dirt2;
         if (kind == Earthwork::Channel) tile.terrain = Core::TerrainType::Dirt3;
-        if (kind == Earthwork::Lake) tile.terrain = Core::TerrainType::MediumWater;
+        if (kind == Earthwork::Lake || kind == Earthwork::River || kind == Earthwork::WaterMoat)
+            tile.terrain = Core::TerrainType::MediumWater;
         else if (wasWater) tile.terrain = Core::TerrainType::Sand;
     }
     tile.elevation = level;
     tile.earthwork = kind;
+    tile.m_flowDirection = flowDirection;
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (InBounds(x + dx, y + dy))

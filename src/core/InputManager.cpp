@@ -212,7 +212,7 @@ void InputManager::GivePendingOrder(ECS::Simulation& sim, float x, float y) {
         const int tileX = Physics::TileOf(Fixed32(x)), tileY = Physics::TileOf(Fixed32(y));
         CommandQueue::Get().PushCommand(PlantLayoutCommand{units,
             isPlantDrag ? plantFromX : tileX, isPlantDrag ? plantFromY : tileY,
-            tileX, tileY, plantShape, append, Core::LocalPlayer(), plantKind, plantHeight});
+            tileX, tileY, plantShape, append, Core::LocalPlayer(), plantKind, plantHeight, m_waterWidth});
         isPlantDrag = false;
         if (append) pending_order = PendingOrder::PlantTree;
         return;
@@ -1165,6 +1165,7 @@ void InputManager::RunCommand(ECS::Simulation& sim, const Rendering::UIRenderer:
         plantShape = static_cast<Core::PlantShape>(cmd.choice);
         plantKind = cmd.jobKind;
         plantHeight = cmd.height;
+        m_waterWidth = cmd.m_width;
         isPlantDrag = false;
         break;
     case Rendering::UIRenderer::Action::CancelPlanting: {

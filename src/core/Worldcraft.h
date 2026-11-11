@@ -11,7 +11,7 @@ namespace Core::worldcraft
   constexpr WorldJobKind workMarkerKind(int slp)
   {
     const auto kind = static_cast<WorldJobKind>(-100 - slp);
-    return slp <= -100 && slp >= -106 && isEarthwork(kind) ? kind : static_cast<WorldJobKind>(0);
+    return slp <= -100 && slp >= -109 && isEarthwork(kind) ? kind : static_cast<WorldJobKind>(0);
   }
   // Хранит проверенные правила посадки и ссылки на графику оригинального комплекта.
   struct PlantRules
