@@ -14,8 +14,8 @@ namespace Rendering::earthwork_marker
       {0, 15}, {-22, 10}, {-30, 0}, {-22, -8}}};
     std::array<SDL_Vertex, 72> vertices{};
     int count = 0;
-    const bool hole = kind == Core::WorldJobKind::DigDitch || kind == Core::WorldJobKind::DigChannel || kind == Core::WorldJobKind::DigLake;
-    const bool lake = kind == Core::WorldJobKind::DigLake;
+    const bool lake = kind == Core::WorldJobKind::DigLake || Core::isWaterwork(kind);
+    const bool hole = kind == Core::WorldJobKind::DigDitch || kind == Core::WorldJobKind::DigChannel || lake;
     const float stage = std::clamp(progress, 0.0f, 1.0f);
     const float peak = kind == Core::WorldJobKind::RestoreGround ? -5.0f : -24.0f - 12.0f * stage;
     auto colour = [&](int r, int g, int b)

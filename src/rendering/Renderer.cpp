@@ -1,7 +1,8 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Text.h"
 #include "FogRenderer.h"
 #include "TerrainRenderer.h"
+#include "RiverFlow.h"
 #include "EntityRenderer.h"
 #include "UIRenderer.h"
 #include "Messages.h"
@@ -132,6 +133,7 @@ void Renderer::Render(ECS::Simulation& sim, HAL::Window& window, float alpha) {
     };
     Clock::time_point mark = Clock::now();
     TerrainRenderer::DrawTerrain(sim, *this, sdl_r);
+    river_flow::draw(sim, *this, sdl_r);
     cost.terrain = since(mark);
     // The fog goes over the ground and what lies on it; what stands on seen
     // ground is drawn whole over the fog, even where it reaches over fog or

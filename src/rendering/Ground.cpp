@@ -54,6 +54,7 @@ const Physics::Grid& SeenGrid(const ECS::Simulation& sim, Core::PlayerId viewer)
             tile.elevation = remembered.elevation;
             tile.pinnedCorners = remembered.pinnedCorners;
             tile.cornerHeights = remembered.cornerHeights;
+            tile.m_flowDirection = remembered.m_flowDirection;
         }
     }
     sourceSerial = grid.Serial();

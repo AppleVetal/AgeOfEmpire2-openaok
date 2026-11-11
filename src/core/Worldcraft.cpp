@@ -15,7 +15,7 @@ namespace Core::worldcraft
   namespace
   {
     PlantRules loaded;
-    std::array<WorkRules, 5> earthRules;
+    std::array<WorkRules, 7> earthRules;
     std::map<std::string, std::string> strings;
 
     nlohmann::json read(const std::filesystem::path& path)
@@ -47,8 +47,8 @@ namespace Core::worldcraft
         throw std::runtime_error("unsupported worldcraft manifest");
       const auto allRules = read(root / "rules.json");
       const auto rules = allRules.at("plant_tree");
-      std::array<WorkRules, 5> earthCandidate;
-      const std::array<const char*, 5> names{"raise_ground", "dig_ditch", "restore_ground", "dig_channel", "dig_lake"};
+      std::array<WorkRules, 7> earthCandidate;
+      const std::array<const char*, 7> names{"raise_ground", "dig_ditch", "restore_ground", "dig_channel", "dig_lake", "dig_river", "dig_water_moat"};
       for (std::size_t i = 0; i < names.size(); ++i)
       {
         const auto& rule = allRules.at(names[i]);
@@ -67,7 +67,8 @@ namespace Core::worldcraft
       std::map<std::string, std::string> labels;
       for (const auto* key : {"plant", "plant_help", "line", "area", "cancel", "cancel_help", "working", "growing", "choose_site",
           "raise_ground", "dig_ditch", "restore_ground", "dig_channel", "dig_lake", "earthwork_help", "line_shape", "area_shape",
-          "earthwork_menu", "hill_height", "mountain_height", "high_mountain_height", "height_help"})
+          "earthwork_menu", "hill_height", "mountain_height", "high_mountain_height", "height_help",
+          "dig_river", "dig_water_moat", "waterwork_menu", "waterwork_help", "water_width"})
       {
         const auto value = words.at(key).get<std::string>();
         if (value.empty() || value.size() > 4096) throw std::runtime_error(std::string("invalid text: ") + key);
@@ -135,6 +136,7 @@ namespace Core::worldcraft
     }
     if (kind == WorldJobKind::PlantTree) return {loaded.woodCost, loaded.workMs};
     if (!isEarthwork(kind)) throw std::invalid_argument("invalid worldcraft job kind");
+    if (isWaterwork(kind)) return earthRules.at(kind == WorldJobKind::DigRiver ? 5 : 6);
     return earthRules.at(static_cast<std::size_t>(kind) - static_cast<std::size_t>(WorldJobKind::RaiseGround));
   }
 
@@ -148,13 +150,15 @@ namespace Core::worldcraft
     case WorldJobKind::RestoreGround: return text("restore_ground");
     case WorldJobKind::DigChannel: return text("dig_channel");
     case WorldJobKind::DigLake: return text("dig_lake");
+    case WorldJobKind::DigRiver: return text("dig_river");
+    case WorldJobKind::DigWaterMoat: return text("dig_water_moat");
     default: return text("working");
     }
   }
 
   std::string earthworkHelp(WorldJobKind kind)
   {
-    auto result = jobName(kind) + ". " + text("earthwork_help");
+    auto result = jobName(kind) + ". " + text(isWaterwork(kind) ? "waterwork_help" : "earthwork_help");
     const auto rules = workRules(kind);
     for (const auto& [key, value] : {std::pair<std::string, int>{"{cost}", rules.woodCost},
         {"{work}", (rules.workMs + 999) / 1000}, {"{limit}", siteLimit}})

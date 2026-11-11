@@ -279,6 +279,7 @@ constexpr int kPageRoot = 0;   // not an InterfaceKind: the unit's own commands
 struct Hud {
     int page = kPageRoot;
     int earthworkHeight = Core::mountainHeight;
+    int m_waterWidth = 3;
     entt::entity following = entt::null;
     // The locked formation the selection is in, Line when none: a group sent
     // together marches in it.
@@ -1709,6 +1710,7 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
             }
             order(kSlotCancelPlanting, CommandKind::CancelPlanting, kIconCancel, -1);
             page_switch(9, kIconRepair, earthworkPage, -1);
+            page_switch(12, kIconRepair, waterworkPage, -1);
             if (auto* command = order(11, CommandKind::PlantTree, kIconRepair, -1)) {
                 command->jobKind = Core::WorldJobKind::GrowTreeman;
                 command->choice = static_cast<int>(Core::PlantShape::Line);
@@ -1718,6 +1720,34 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
                     ECS::Players::Stock(*player, Core::ResourceType::Wood) >= tree.woodCost &&
                     ECS::Players::Stock(*player, Core::ResourceType::Gold) >= tree.goldCost;
             }
+        } else if (page == waterworkPage) {
+            constexpr int widths[3] = {1, 3, 5};
+            for (int i = 0; i < 3; ++i)
+            {
+              if (auto* command = order(i + 1, CommandKind::WaterWidth, kIconRepair, -1))
+              {
+                command->m_width = widths[i];
+                command->label = widths[i];
+                command->jobKind = Core::WorldJobKind::DigRiver;
+              }
+            }
+            constexpr Core::WorldJobKind kinds[3] = {Core::WorldJobKind::DigRiver,
+              Core::WorldJobKind::DigWaterMoat, Core::WorldJobKind::RestoreGround};
+            constexpr int workSlots[6] = {6, 7, 8, 9, 11, 12};
+            for (int i = 0; i < 6; ++i)
+            {
+              if (auto* command = order(workSlots[i], CommandKind::Earthwork, kIconRepair, -1))
+              {
+                command->jobKind = kinds[i / 2];
+                command->m_width = Core::isWaterwork(command->jobKind) ? HudState().m_waterWidth : 1;
+                command->choice = static_cast<int>(i % 2 == 0 ? Core::PlantShape::Line : Core::PlantShape::Area);
+                const auto* player = ECS::Players::Find(registry, LocalViewer());
+                command->affordable = player != nullptr && ECS::Players::Stock(*player, Core::ResourceType::Wood) >=
+                  Core::worldcraft::workRules(command->jobKind).woodCost;
+              }
+            }
+            order(14, CommandKind::CancelPlanting, kIconCancel, -1);
+            page_switch(kSlotCancel, kIconCancel, kPageRoot, 4911);
         } else if (page == earthworkPage) {
             constexpr int heights[3] = {Core::hillHeight, Core::mountainHeight, Core::highMountainHeight};
             for (int i = 0; i < 3; ++i) {
@@ -2030,6 +2060,9 @@ UIRenderer::Action UIRenderer::ActivateCommand(const Command& command) {
     case CommandKind::EarthworkHeight:
         HudState().earthworkHeight = command.height;
         return Action::None;
+    case CommandKind::WaterWidth:
+        if (Core::isWaterWidth(command.m_width)) HudState().m_waterWidth = command.m_width;
+        return Action::None;
     case CommandKind::CancelPlanting:
         return Action::CancelPlanting;
     case CommandKind::SwitchPage:
@@ -2293,7 +2326,8 @@ void DrawCommandPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int 
             continue;
         }
         const bool pressed = (held && Inside(cmd.rect, mx, my)) ||
-            (cmd.kind == UIRenderer::CommandKind::EarthworkHeight && cmd.height == HudState().earthworkHeight);
+            (cmd.kind == UIRenderer::CommandKind::EarthworkHeight && cmd.height == HudState().earthworkHeight) ||
+            (cmd.kind == UIRenderer::CommandKind::WaterWidth && cmd.m_width == HudState().m_waterWidth);
         DrawIcon(sdl_r, cmd.icon_slp, cmd.icon_frame, SDL_Rect{x + 2, y + 2, 36, 36},
                  LocalViewer(), cmd.enabled ? 255 : 110);
         Bevel(sdl_r, x, y, 40, 40, pressed);
@@ -2301,15 +2335,24 @@ void DrawCommandPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int 
             Fill(sdl_r, x + 3, y + 3, 34, 34, kBlack);
             DrawTreemanIcon(sdl_r, SDL_Rect{x + 3, y + 3, 34, 34}, LocalViewer(), cmd.enabled ? 255 : 110);
         } else if (cmd.kind == UIRenderer::CommandKind::PlantTree || cmd.kind == UIRenderer::CommandKind::Earthwork ||
-            cmd.kind == UIRenderer::CommandKind::EarthworkHeight ||
-            (cmd.kind == UIRenderer::CommandKind::SwitchPage && cmd.target_page == UIRenderer::earthworkPage)) {
+            cmd.kind == UIRenderer::CommandKind::EarthworkHeight || cmd.kind == UIRenderer::CommandKind::WaterWidth ||
+            (cmd.kind == UIRenderer::CommandKind::SwitchPage &&
+                (cmd.target_page == UIRenderer::earthworkPage || cmd.target_page == UIRenderer::waterworkPage))) {
             // Tree symbols arranged as a line or a patch distinguish the two modes.
             Fill(sdl_r, x + 3, y + 3, 34, 34, kBlack);
             const int rows = cmd.choice == static_cast<int>(Core::PlantShape::Area) ? 3 : 1;
             for (int row = 0; row < rows; ++row) {
                 for (int col = 0; col < 3; ++col) {
                     const int tx = x + 7 + col * 10, ty = y + (rows == 1 ? 15 : 5) + row * 10;
-                    if (cmd.jobKind == Core::WorldJobKind::RaiseGround || cmd.kind == UIRenderer::CommandKind::SwitchPage) {
+                    if (Core::isWaterwork(cmd.jobKind) ||
+                        (cmd.kind == UIRenderer::CommandKind::SwitchPage && cmd.target_page == UIRenderer::waterworkPage)) {
+                        Fill(sdl_r, tx, ty + 1, 8, 7, SDL_Color{64, 142, 224, 255});
+                        Fill(sdl_r, tx + 2, ty + 3, 4, 1, kWhite);
+                        if (cmd.jobKind == Core::WorldJobKind::DigWaterMoat) {
+                            Fill(sdl_r, tx, ty, 8, 1, kWhite);
+                            Fill(sdl_r, tx, ty + 8, 8, 1, kWhite);
+                        }
+                    } else if (cmd.jobKind == Core::WorldJobKind::RaiseGround || cmd.kind == UIRenderer::CommandKind::SwitchPage) {
                         for (int level = 0; level < 4; ++level)
                             Fill(sdl_r, tx + 3 - level, ty + level * 2, 1 + level * 2, 2, kWhite);
                     } else if (cmd.jobKind == Core::WorldJobKind::DigDitch || cmd.jobKind == Core::WorldJobKind::DigChannel) {
@@ -2610,6 +2653,10 @@ const UIRenderer::Command* HoveredCommand(const UIRenderer::Command* commands, i
 } // namespace
 
 std::string UIRenderer::CommandHelp(ECS::Simulation& sim, const Command& command) {
+    if (command.kind == CommandKind::SwitchPage && command.target_page == waterworkPage)
+        return Core::worldcraft::text("waterwork_menu");
+    if (command.kind == CommandKind::WaterWidth)
+        return Core::worldcraft::text("water_width") + ": " + std::to_string(command.m_width);
     if (command.kind == CommandKind::SwitchPage && command.target_page == earthworkPage)
         return Core::worldcraft::text("earthwork_menu");
     if (command.kind == CommandKind::EarthworkHeight)
@@ -2617,6 +2664,8 @@ std::string UIRenderer::CommandHelp(ECS::Simulation& sim, const Command& command
     if (command.kind == CommandKind::Earthwork)
         return Core::worldcraft::text(command.choice == static_cast<int>(Core::PlantShape::Area) ? "area_shape" : "line_shape") +
             ". " + (command.jobKind == Core::WorldJobKind::RaiseGround ? Core::worldcraft::heightName(command.height) + ". " : "") +
+            (Core::isWaterwork(command.jobKind) && command.choice == static_cast<int>(Core::PlantShape::Line) ?
+                Core::worldcraft::text("water_width") + ": " + std::to_string(command.m_width) + ". " : "") +
             Core::worldcraft::earthworkHelp(command.jobKind);
     if (command.kind == CommandKind::PlantTree && command.jobKind == Core::WorldJobKind::GrowTreeman)
         return Core::treeman::settings().grow + ". " + Core::treeman::settings().help;
@@ -2719,6 +2768,8 @@ void UIRenderer::DrawHelpText(ECS::Simulation& sim, SDL_Renderer* sdl_r, int win
     }()) {
         text = Core::worldcraft::text("choose_site");
         const auto kind = Core::InputManager::Get().workKind();
+        if (Core::isWaterwork(kind))
+            text = Core::worldcraft::text("water_width") + ": " + std::to_string(Core::InputManager::Get().workWidth()) + ". " + text;
         if (Core::isEarthwork(kind) || kind == Core::WorldJobKind::GrowTreeman)
             text = Core::worldcraft::jobName(kind) + ". " + text;
         if (kind == Core::WorldJobKind::RaiseGround)

@@ -117,7 +117,8 @@ namespace ECS::world_jobs
 
   bool order(entt::registry& registry, Physics::Grid& grid, const Core::WorldJobCommand& command, int levels)
   {
-    if (!Core::isMountainHeight(command.height)) return false;
+    if (!Core::isMountainHeight(command.height) || command.m_flowDirection > 8 ||
+        (command.kind != Core::WorldJobKind::DigRiver && command.m_flowDirection != 0)) return false;
     if (levels == 0) levels = command.kind == Core::WorldJobKind::RaiseGround ? command.height : 1;
     if (command.player == Core::PLAYER_GAIA || command.player >= Core::kMaxPlayers ||
         !Core::isWorldJobKind(command.kind) || !grid.InBounds(command.tileX, command.tileY) ||
@@ -167,6 +168,8 @@ namespace ECS::world_jobs
         command.tileX, command.tileY, cost, work.workMs * steps, {}, isEarthwork ? 0 : rules.growthMs, false, targetLevel,
         isEarthwork && command.kind == Core::WorldJobKind::RaiseGround ? steps : 1});
       registry.get<c::WorldJob>(site).paidGold = work.goldCost;
+      registry.get<c::WorldJob>(site).m_flowDirection = command.kind == Core::WorldJobKind::DigRiver ?
+        std::max<uint8_t>(1, command.m_flowDirection) : 0;
       if (isEarthwork)
       {
         c::Sprite marker;
@@ -219,13 +222,60 @@ namespace ECS::world_jobs
     return tiles;
   }
 
+  std::vector<std::pair<int, int>> layout(const Physics::Grid& grid, const Core::PlantLayoutCommand& command)
+  {
+    if (!Core::isWorldJobKind(command.kind) || !Core::isMountainHeight(command.height) ||
+        !Core::isWaterWidth(command.m_width) || (!Core::isWaterwork(command.kind) && command.m_width != 1)) return {};
+    const bool isReversed = Core::isWaterwork(command.kind) && command.shape == Core::PlantShape::Line &&
+      std::pair{command.fromX, command.fromY} > std::pair{command.toX, command.toY};
+    auto centers = isReversed ? layout(grid, command.toX, command.toY, command.fromX, command.fromY, command.shape) :
+      layout(grid, command.fromX, command.fromY, command.toX, command.toY, command.shape);
+    if (isReversed) std::reverse(centers.begin(), centers.end());
+    if (!Core::isWaterwork(command.kind) || command.shape == Core::PlantShape::Area) return centers;
+    std::vector<std::pair<int, int>> tiles;
+    tiles.reserve(activeSiteLimit);
+    const auto add = [&](int x, int y)
+    {
+      const std::pair<int, int> tile{x, y};
+      if (!grid.InBounds(x, y) || std::find(tiles.begin(), tiles.end(), tile) != tiles.end()) return true;
+      if (tiles.size() >= activeSiteLimit) return false;
+      tiles.push_back(tile);
+      return true;
+    };
+    // Excavate the centre before the banks; connect diagonal cells along an edge.
+    for (int ring = 0; ring <= command.m_width / 2; ++ring)
+    {
+      for (std::size_t index = 0; index < centers.size(); ++index)
+      {
+        const auto [x, y] = centers[index];
+        for (int dy = -ring; dy <= ring; ++dy)
+          for (int dx = -ring; dx <= ring; ++dx)
+          {
+            if (std::max(std::abs(dx), std::abs(dy)) != ring) continue;
+            if (!add(x + dx, y + dy)) return {};
+            if (index == 0) continue;
+            const auto [previousX, previousY] = centers[index - 1];
+            if (x != previousX && y != previousY)
+            {
+              const int bridgeX = std::max(x, previousX);
+              const int bridgeY = x > previousX ? previousY : y;
+              if (!add(bridgeX + dx, bridgeY + dy)) return {};
+            }
+          }
+      }
+    }
+    return tiles;
+  }
+
   void plantLayout(entt::registry& registry, Physics::Grid& grid, const Core::PlantLayoutCommand& command)
   {
-    const auto tiles = layout(grid, command.fromX, command.fromY, command.toX, command.toY, command.shape);
+    const auto tiles = layout(grid, command);
+    const uint8_t flowDirection = command.kind == Core::WorldJobKind::DigRiver ?
+      Core::riverDirection(command.fromX, command.fromY, command.toX, command.toY) : 0;
     bool append = command.append;
     for (const auto& [x, y] : tiles)
     {
-      if (order(registry, grid, {command.workers, command.kind, x, y, append, command.player, command.height}, layoutLevels(command, x, y)))
+      if (order(registry, grid, {command.workers, command.kind, x, y, append, command.player, command.height, flowDirection}, layoutLevels(command, x, y)))
         append = true;
     }
   }

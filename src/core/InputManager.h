@@ -10,6 +10,7 @@ namespace Rendering { class Renderer; }
 
 namespace Core {
 
+// Преобразует ввод игрока в команды и хранит параметры размещения объектов.
 class InputManager {
 public:
     static InputManager& Get() {
@@ -76,6 +77,7 @@ public:
     }
     Core::WorldJobKind workKind() const { return plantKind; }
     int workHeight() const { return plantHeight; }
+    int workWidth() const { return m_waterWidth; }
 
     // What an order would do to what is under the cursor, which picks the
     // cursor: a sword over an enemy, an axe over a tree.
@@ -144,6 +146,7 @@ private:
     Core::PlantShape plantShape = Core::PlantShape::Line;
     Core::WorldJobKind plantKind = Core::WorldJobKind::PlantTree;
     int plantHeight = Core::mountainHeight;
+    int m_waterWidth = 1;
     int wall_from_x = 0;
     int wall_from_y = 0;
 

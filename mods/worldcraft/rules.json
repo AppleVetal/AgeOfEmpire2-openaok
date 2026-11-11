@@ -9,5 +9,7 @@
   "dig_ditch": { "wood_cost": 5, "work_ms": 10000 },
   "restore_ground": { "wood_cost": 5, "work_ms": 10000 },
   "dig_channel": { "wood_cost": 3, "work_ms": 5000 },
-  "dig_lake": { "wood_cost": 5, "work_ms": 10000 }
+  "dig_lake": { "wood_cost": 5, "work_ms": 10000 },
+  "dig_river": { "wood_cost": 5, "work_ms": 10000 },
+  "dig_water_moat": { "wood_cost": 5, "work_ms": 10000 }
 }

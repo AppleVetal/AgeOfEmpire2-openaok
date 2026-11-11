@@ -13,6 +13,7 @@ namespace ECS::world_jobs
   bool order(entt::registry& registry, Physics::Grid& grid, const Core::WorldJobCommand& command, int levels = 0);
   std::vector<std::pair<int, int>> layout(const Physics::Grid& grid, int fromX, int fromY,
     int toX, int toY, Core::PlantShape shape);
+  std::vector<std::pair<int, int>> layout(const Physics::Grid& grid, const Core::PlantLayoutCommand& command);
   void plantLayout(entt::registry& registry, Physics::Grid& grid, const Core::PlantLayoutCommand& command);
   int layoutLevels(const Core::PlantLayoutCommand& command, int x, int y);
   void cancel(entt::registry& registry, Physics::Grid& grid, entt::entity site, Core::PlayerId player);

@@ -261,7 +261,7 @@ namespace ECS::earthworks
   {
     if (kind == WorldJobKind::RaiseGround)
       return std::min(Physics::earthworkMaxLevel, tile.elevation + std::clamp(levels, 1, Physics::earthworkMaxLevel));
-    if (kind == WorldJobKind::DigLake) return -ditchDepth;
+    if (kind == WorldJobKind::DigLake || Core::isWaterwork(kind)) return -ditchDepth;
     if (kind == WorldJobKind::DigDitch)
       return std::max(Physics::earthworkMinLevel, tile.elevation - ditchDepth);
     if (kind == WorldJobKind::DigChannel)
@@ -281,6 +281,8 @@ namespace ECS::earthworks
     {
       if (kind == WorldJobKind::RaiseGround && !isWater(tile.terrain)) return false;
       if (kind == WorldJobKind::DigLake && tile.earthwork == Physics::Earthwork::Lake) return false;
+      if (kind == WorldJobKind::DigRiver && tile.earthwork == Physics::Earthwork::River) return false;
+      if (kind == WorldJobKind::DigWaterMoat && tile.earthwork == Physics::Earthwork::WaterMoat) return false;
       if (kind == WorldJobKind::DigDitch && tile.earthwork == Physics::Earthwork::Ditch && !isWater(tile.terrain)) return false;
       if (kind == WorldJobKind::DigChannel && tile.earthwork == Physics::Earthwork::Channel && !isWater(tile.terrain)) return false;
     }
@@ -369,8 +371,10 @@ namespace ECS::earthworks
     const auto kind = job.kind == WorldJobKind::RaiseGround ? Physics::Earthwork::Raised :
       job.kind == WorldJobKind::DigDitch ? Physics::Earthwork::Ditch :
       job.kind == WorldJobKind::DigChannel ? Physics::Earthwork::Channel :
+      job.kind == WorldJobKind::DigRiver ? Physics::Earthwork::River :
+      job.kind == WorldJobKind::DigWaterMoat ? Physics::Earthwork::WaterMoat :
       job.kind == WorldJobKind::DigLake ? Physics::Earthwork::Lake : Physics::Earthwork::None;
-    for (const auto& cell : cells) grid.SetEarthwork(cell.x, cell.y, cell.level, kind);
+    for (const auto& cell : cells) grid.SetEarthwork(cell.x, cell.y, cell.level, kind, job.m_flowDirection);
     return true;
   }
 }

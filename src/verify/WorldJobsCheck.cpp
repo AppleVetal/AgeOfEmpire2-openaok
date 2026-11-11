@@ -358,7 +358,7 @@ namespace Verify
       ~Pair() { Net::Leave(client); Net::Leave(host); }
     };
 
-    const char* network(bool hasEarthworks = false)
+    const char* network(bool hasEarthworks = false, bool hasRivers = false)
     {
       Pair pair;
       if (!Net::Host(pair.host, 0, setup(), 2) ||
@@ -373,16 +373,20 @@ namespace Verify
       ECS::Simulation host, client;
       host.Init(pair.host.setup); client.Init(pair.client.setup);
       int x = 0, y = 0, cx = 0, cy = 0;
-      const auto hostKind = hasEarthworks ? Core::WorldJobKind::RaiseGround : Core::WorldJobKind::PlantTree;
-      const auto clientKind = hasEarthworks ? Core::WorldJobKind::DigDitch : Core::WorldJobKind::PlantTree;
-      if (!patch(host, 1, 3, 1, x, y, hostKind) || !patch(host, 2, 2, 2, cx, cy, clientKind)) return "no network work sites";
+      const auto hostKind = hasRivers ? Core::WorldJobKind::DigRiver :
+        hasEarthworks ? Core::WorldJobKind::RaiseGround : Core::WorldJobKind::PlantTree;
+      const auto clientKind = hasRivers ? Core::WorldJobKind::DigWaterMoat :
+        hasEarthworks ? Core::WorldJobKind::DigDitch : Core::WorldJobKind::PlantTree;
+      if (!patch(host, 1, hasRivers ? 5 : 3, hasRivers ? 3 : 1, x, y, hostKind) ||
+          !patch(host, 2, 2, 2, cx, cy, clientKind)) return "no network work sites";
+      if (hasRivers) { ++x; ++y; }
       int peaks[3]{};
       for (int i = 0; i < 3; ++i) peaks[i] = host.GetGrid().GetTile(x + i, y).elevation + Core::mountainHeight;
       Net::Issue(pair.host, Core::PlantLayoutCommand{workers(host, 1), x, y, x + 2, y,
-        Core::PlantShape::Line, false, 1, hostKind});
+        Core::PlantShape::Line, false, 1, hostKind, Core::mountainHeight, hasRivers ? 3 : 1});
       Net::Issue(pair.client, Core::PlantLayoutCommand{workers(host, 2), cx, cy, cx + 1, cy + 1,
         Core::PlantShape::Area, false, 2, clientKind});
-      const uint64_t ticks = hasEarthworks ? 30000 : 10000;
+      const uint64_t ticks = hasEarthworks || hasRivers ? 30000 : 10000;
       const auto advance = [ticks](Net::Session& session, ECS::Simulation& sim)
       {
         std::vector<Core::Command> due;
@@ -405,6 +409,17 @@ namespace Verify
       const int completed = hasEarthworks ? static_cast<int>(std::count_if(host.GetGrid().Tiles().begin(), host.GetGrid().Tiles().end(),
         [](const Physics::Tile& tile) { return tile.earthwork != Physics::Earthwork::None; })) : treeCount(host.GetRegistry());
       bool finished = hasEarthworks ? completed >= 7 : completed == 7;
+      if (hasRivers)
+      {
+        finished = host.GetRegistry().view<c::WorldJob>().empty();
+        for (int row = -1; row <= 1; ++row)
+          for (int col = -1; col <= 3; ++col)
+            finished = finished && host.GetGrid().GetTile(x + col, y + row).earthwork == Physics::Earthwork::River &&
+              host.GetGrid().GetTile(x + col, y + row).m_flowDirection == 1;
+        for (int row = 0; row < 2; ++row)
+          for (int col = 0; col < 2; ++col)
+            finished = finished && host.GetGrid().GetTile(cx + col, cy + row).earthwork == Physics::Earthwork::WaterMoat;
+      }
       if (hasEarthworks) {
         for (int i = 0; i < 3; ++i) finished = finished && host.GetGrid().GetTile(x + i, y).elevation >= peaks[i];
         for (int row = 0; row < 2; ++row)
@@ -444,6 +459,14 @@ namespace Verify
     const char* failure = network(true);
     Core::CommandQueue::Get().PopAllCommands();
     std::printf("earthnet=%s\n", failure != nullptr ? failure : "ok");
+    return failure == nullptr;
+  }
+
+  bool CheckRiversNetwork()
+  {
+    const char* failure = network(false, true);
+    Core::CommandQueue::Get().PopAllCommands();
+    std::printf("rivernet=%s\n", failure != nullptr ? failure : "ok");
     return failure == nullptr;
   }
 }

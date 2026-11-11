@@ -372,7 +372,30 @@ struct DisbandCommand {
     PlayerId player;
 };
 
-enum class WorldJobKind : uint8_t { PlantTree = 1, RaiseGround, DigDitch, RestoreGround, DigChannel, DigLake, GrowTreeman };
+enum class WorldJobKind : uint8_t { PlantTree = 1, RaiseGround, DigDitch, RestoreGround, DigChannel, DigLake, GrowTreeman, DigRiver, DigWaterMoat };
+
+constexpr bool isWaterwork(WorldJobKind kind)
+{
+  return kind == WorldJobKind::DigRiver || kind == WorldJobKind::DigWaterMoat;
+}
+constexpr bool isWaterWidth(int width) { return width == 1 || width == 3 || width == 5; }
+
+// Clockwise in world coordinates: east, southeast, south, ...; zero is still water.
+constexpr int riverStepX(uint8_t direction)
+{
+  return direction == 1 || direction == 2 || direction == 8 ? 1 : direction >= 4 && direction <= 6 ? -1 : 0;
+}
+constexpr int riverStepY(uint8_t direction)
+{
+  return direction >= 2 && direction <= 4 ? 1 : direction >= 6 && direction <= 8 ? -1 : 0;
+}
+constexpr uint8_t riverDirection(int fromX, int fromY, int toX, int toY)
+{
+  const int dx = (toX > fromX) - (toX < fromX), dy = (toY > fromY) - (toY < fromY);
+  for (uint8_t direction = 1; direction <= 8; ++direction)
+    if (riverStepX(direction) == dx && riverStepY(direction) == dy) return direction;
+  return 1;
+}
 
 constexpr int hillHeight = 4;
 constexpr int mountainHeight = 12;
@@ -385,7 +408,7 @@ constexpr bool isMountainHeight(int height)
 constexpr bool isEarthwork(WorldJobKind kind)
 {
   return kind == WorldJobKind::RaiseGround || kind == WorldJobKind::DigDitch ||
-    kind == WorldJobKind::RestoreGround || kind == WorldJobKind::DigChannel || kind == WorldJobKind::DigLake;
+    kind == WorldJobKind::RestoreGround || kind == WorldJobKind::DigChannel || kind == WorldJobKind::DigLake || isWaterwork(kind);
 }
 
 constexpr bool isWorldJobKind(WorldJobKind kind)
@@ -403,6 +426,7 @@ struct WorldJobCommand
   bool append = false;
   PlayerId player = PLAYER_NONE;
   int32_t height = mountainHeight;
+  uint8_t m_flowDirection = 0;
 };
 
 // Отменяет принадлежащий игроку участок работы с возвратом остатка стоимости.
@@ -414,7 +438,7 @@ struct CancelWorldJobCommand
 
 enum class PlantShape : uint8_t { Line, Area };
 
-// Описывает проведённую мышью линию или прямоугольную область посадки.
+// Описывает линию или область земляных работ и посадки, включая ширину водного русла.
 struct PlantLayoutCommand
 {
   std::vector<entt::entity> workers;
@@ -427,6 +451,7 @@ struct PlantLayoutCommand
   PlayerId player = PLAYER_NONE;
   WorldJobKind kind = WorldJobKind::PlantTree;
   int32_t height = mountainHeight;
+  int32_t m_width = 1;
 };
 
 using Command = std::variant<MoveCommand, GatherCommand, AttackCommand,
