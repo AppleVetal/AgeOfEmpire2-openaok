@@ -1,4 +1,4 @@
-#include "core/Rules.h"
+﻿#include "core/Rules.h"
 
 #include <algorithm>
 #include <cmath>
@@ -297,6 +297,17 @@ bool Load(const std::string& path) {
 }
 
 const Tables& Get() { return g_tables; }
+
+bool RegisterUnit(int id, const UnitRules& rules, const UnitText& text) {
+    if (id < 0 || id > 32767 || !rules.valid || Unit(id) != nullptr || text.name.empty()) return false;
+    Grow(g_tables.units, static_cast<size_t>(id));
+    Grow(g_tables.unit_text, static_cast<size_t>(id));
+    g_tables.units[id] = rules;
+    g_tables.unit_text[id] = text;
+    if (rules.enabled)
+        for (auto& civ : g_tables.civs) civ.enabled.push_back(id);
+    return true;
+}
 
 const UnitRules* Unit(int unit_id) {
     if (unit_id < 0 || unit_id >= static_cast<int>(g_tables.units.size())) return nullptr;

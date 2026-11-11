@@ -35,6 +35,7 @@
 #include "ecs/components/Selectable.h"
 #include "ecs/components/Worker.h"
 #include "ecs/components/WorldJob.h"
+#include "core/Treeman.h"
 #include "core/Worldcraft.h"
 #include "ecs/BuildingGeometry.h"
 #include "ecs/Buildings.h"
@@ -292,6 +293,7 @@ struct Hud {
     // A line for the lower-left corner from whoever knows what the cursor is
     // over in the world, for this frame only.
     int world_hint = -1;
+    int m_worldHintUnitId = -1;
     // A top bar button clicked, for the screens to open.
     int dialog_request = -1;
 
@@ -369,6 +371,26 @@ void DrawIcon(SDL_Renderer* sdl_r, uint32_t slp_id, int frame,
         SDL_RenderCopy(sdl_r, tint, &src, &dst);
         SDL_SetTextureColorMod(tint, 255, 255, 255);
     }
+}
+
+// The add-on has native unit frames, so its portrait uses the same atlas as the world.
+void DrawTreemanIcon(SDL_Renderer* renderer, const SDL_Rect& box, int player, uint8_t dim = 255) {
+    auto& graphics = HAL::GraphicCache::Get();
+    const auto* atlas = graphics.GetAtlas(Core::treeman::idleGraphic);
+    if (atlas == nullptr || atlas->frames.empty()) return;
+    const auto& frame = atlas->frames.front().rect;
+    if (frame.w <= 0 || frame.h <= 0) return;
+    const auto art = graphics.Art(Core::treeman::idleGraphic, player);
+    auto* texture = art.PageOf(frame);
+    if (texture == nullptr) return;
+    const float scale = std::min(static_cast<float>(box.w) / frame.w, static_cast<float>(box.h) / frame.h);
+    const int width = std::max(1, static_cast<int>(frame.w * scale));
+    const int height = std::max(1, static_cast<int>(frame.h * scale));
+    const SDL_Rect destination{box.x + (box.w - width) / 2, box.y + (box.h - height) / 2, width, height};
+    const auto source = art.On(frame);
+    SDL_SetTextureColorMod(texture, dim, dim, dim);
+    SDL_RenderCopy(renderer, texture, &source, &destination);
+    SDL_SetTextureColorMod(texture, 255, 255, 255);
 }
 
 // The same at the frame's own size, its top-left at (x, y) less its hotspot.
@@ -778,7 +800,17 @@ bool UIRenderer::AdvancedCommands() { return HudState().advanced; }
 void UIRenderer::ShowAdvancedCommands() { HudState().advanced = true; }
 bool UIRenderer::HelpShown() { return HudState().help; }
 int UIRenderer::MinimapMode() { return HudState().minimap_mode; }
-void UIRenderer::SetWorldHint(int string_id) { HudState().world_hint = string_id; }
+void UIRenderer::SetWorldHint(int string_id)
+{
+  HudState().world_hint = string_id;
+  HudState().m_worldHintUnitId = -1;
+}
+
+void UIRenderer::setWorldUnitHint(int unitId)
+{
+  HudState().m_worldHintUnitId = unitId;
+  HudState().world_hint = -1;
+}
 void UIRenderer::ToggleClock() { HudState().clock = !HudState().clock; }
 // The world between the bar and the panel, in the frame, at their sizes.
 SDL_Rect UIRenderer::ViewRect(int win_w, int win_h) {
@@ -1153,6 +1185,7 @@ void UIRenderer::NewGame() {
     hud.page = kPageRoot;
     hud.following = entt::null;
     hud.world_hint = -1;
+    hud.m_worldHintUnitId = -1;
     hud.dialog_request = -1;
 }
 void UIRenderer::RequestDialog(int bar_button) { HudState().dialog_request = bar_button; }
@@ -1676,6 +1709,15 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
             }
             order(kSlotCancelPlanting, CommandKind::CancelPlanting, kIconCancel, -1);
             page_switch(9, kIconRepair, earthworkPage, -1);
+            if (auto* command = order(11, CommandKind::PlantTree, kIconRepair, -1)) {
+                command->jobKind = Core::WorldJobKind::GrowTreeman;
+                command->choice = static_cast<int>(Core::PlantShape::Line);
+                const auto* player = ECS::Players::Find(registry, LocalViewer());
+                const auto& tree = Core::treeman::settings();
+                command->affordable = player != nullptr &&
+                    ECS::Players::Stock(*player, Core::ResourceType::Wood) >= tree.woodCost &&
+                    ECS::Players::Stock(*player, Core::ResourceType::Gold) >= tree.goldCost;
+            }
         } else if (page == earthworkPage) {
             constexpr int heights[3] = {Core::hillHeight, Core::mountainHeight, Core::highMountainHeight};
             for (int i = 0; i < 3; ++i) {
@@ -2255,7 +2297,10 @@ void DrawCommandPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int 
         DrawIcon(sdl_r, cmd.icon_slp, cmd.icon_frame, SDL_Rect{x + 2, y + 2, 36, 36},
                  LocalViewer(), cmd.enabled ? 255 : 110);
         Bevel(sdl_r, x, y, 40, 40, pressed);
-        if (cmd.kind == UIRenderer::CommandKind::PlantTree || cmd.kind == UIRenderer::CommandKind::Earthwork ||
+        if (cmd.kind == UIRenderer::CommandKind::PlantTree && cmd.jobKind == Core::WorldJobKind::GrowTreeman) {
+            Fill(sdl_r, x + 3, y + 3, 34, 34, kBlack);
+            DrawTreemanIcon(sdl_r, SDL_Rect{x + 3, y + 3, 34, 34}, LocalViewer(), cmd.enabled ? 255 : 110);
+        } else if (cmd.kind == UIRenderer::CommandKind::PlantTree || cmd.kind == UIRenderer::CommandKind::Earthwork ||
             cmd.kind == UIRenderer::CommandKind::EarthworkHeight ||
             (cmd.kind == UIRenderer::CommandKind::SwitchPage && cmd.target_page == UIRenderer::earthworkPage)) {
             // Tree symbols arranged as a line or a patch distinguish the two modes.
@@ -2369,7 +2414,8 @@ void DrawUnitPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int win
         const int progress = worldJob->phase == ECS::Components::WorldJobPhase::Working
             ? (worldJob->workedMs * Core::Fixed32(100) / Core::Fixed32(worldJob->workMs)).ToInt()
             : 100 - worldJob->growthLeftMs * 100 / Core::worldcraft::plantRules().growthMs;
-        const std::string label = std::to_string(progress) + "%";
+        const std::string label = worldJob->kind == Core::WorldJobKind::GrowTreeman && progress == 100
+            ? Core::treeman::settings().populationWait : std::to_string(progress) + "%";
         Text::Draw(sdl_r, Text::kArial8, layout.stat_text.x, layout.stat_text.y, label, kBlack);
     }
 
@@ -2382,6 +2428,8 @@ void DrawUnitPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int win
     if (worldJob != nullptr && Core::isEarthwork(worldJob->kind))
         earthwork_marker::draw(sdl_r, worldJob->kind, static_cast<float>(layout.portrait.x + 18),
             static_cast<float>(layout.portrait.y + 22), 0.5f);
+    else if (unit_id == Core::treeman::unitId || unit_id == Core::treeman::wildUnitId)
+        DrawTreemanIcon(sdl_r, SDL_Rect{layout.portrait.x, layout.portrait.y, 36, 36}, owner);
     else DrawIcon(sdl_r, IconSheetFor(unit_id), ui->icon,
              SDL_Rect{layout.portrait.x, layout.portrait.y, 36, 36},
              owner != Core::PLAYER_GAIA ? owner : LocalViewer(), 255);
@@ -2537,7 +2585,9 @@ void DrawSelectionCards(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, in
         // The icon at its own size, its hit points over its bottom two rows.
         Fill(sdl_r, r.x + 2, r.y + 2, r.w - 4, r.h - 4, kBlack);
         if (ui) {
-            DrawIcon(sdl_r, IconSheetFor(unit_id), ui->icon,
+            if (unit_id == Core::treeman::unitId || unit_id == Core::treeman::wildUnitId)
+                DrawTreemanIcon(sdl_r, SDL_Rect{r.x + 2, r.y + 2, r.w - 4, r.h - 4}, owner);
+            else DrawIcon(sdl_r, IconSheetFor(unit_id), ui->icon,
                      SDL_Rect{r.x + 2, r.y + 2, r.w - 4, r.h - 4}, owner, 255);
         }
         if (const auto* health = registry.try_get<ECS::Components::Health>(card.unit)) {
@@ -2568,6 +2618,8 @@ std::string UIRenderer::CommandHelp(ECS::Simulation& sim, const Command& command
         return Core::worldcraft::text(command.choice == static_cast<int>(Core::PlantShape::Area) ? "area_shape" : "line_shape") +
             ". " + (command.jobKind == Core::WorldJobKind::RaiseGround ? Core::worldcraft::heightName(command.height) + ". " : "") +
             Core::worldcraft::earthworkHelp(command.jobKind);
+    if (command.kind == CommandKind::PlantTree && command.jobKind == Core::WorldJobKind::GrowTreeman)
+        return Core::treeman::settings().grow + ". " + Core::treeman::settings().help;
     if (command.kind == CommandKind::PlantTree)
         return Core::worldcraft::text(command.choice == static_cast<int>(Core::PlantShape::Area)
             ? "area" : "line") + ". " + Core::worldcraft::plantHelp();
@@ -2667,15 +2719,20 @@ void UIRenderer::DrawHelpText(ECS::Simulation& sim, SDL_Renderer* sdl_r, int win
     }()) {
         text = Core::worldcraft::text("choose_site");
         const auto kind = Core::InputManager::Get().workKind();
-        if (Core::isEarthwork(kind)) text = Core::worldcraft::jobName(kind) + ". " + text;
+        if (Core::isEarthwork(kind) || kind == Core::WorldJobKind::GrowTreeman)
+            text = Core::worldcraft::jobName(kind) + ". " + text;
         if (kind == Core::WorldJobKind::RaiseGround)
             text = Core::worldcraft::heightName(Core::InputManager::Get().workHeight()) + ". " + text;
         if (const auto at = text.find("{limit}"); at != std::string::npos)
             text.replace(at, 7, std::to_string(Core::worldcraft::siteLimit));
+    } else if (hud.m_worldHintUnitId >= 0) {
+        const auto* unit = Core::ConfigManager::Get().GetUnitInterface(hud.m_worldHintUnitId);
+        if (unit != nullptr) text = unit->help;
     } else if (hud.world_hint >= 0) {
         text = Core::Strings::Get(hud.world_hint);
     }
     hud.world_hint = -1;
+    hud.m_worldHintUnitId = -1;
     if (text.empty() || !hud.help) return;
 
     // In its box over the map just above the panel, the map darkened through

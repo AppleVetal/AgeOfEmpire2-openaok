@@ -53,6 +53,7 @@
 #include "systems/MovementSystem.h"
 #include "systems/WorkerSystem.h"
 #include "ecs/WorldJobs.h"
+#include "ecs/WildTrees.h"
 
 namespace ECS {
 
@@ -251,6 +252,8 @@ void Simulation::Init(const Core::GameSetup& game) {
                            player_starts[i].first, player_starts[i].second);
     }
 
+    wild_trees::populate(*this);
+
     // Allied Town Centers are visible from the start: each team-mate's start
     // is explored as far as its Town Center sees.
     for (size_t i = 0; i < player_starts.size() && i < seats.size(); ++i) {
@@ -317,6 +320,7 @@ void Simulation::Update(int32_t dt_ms) {
     { Core::Costs::Scope cost(Core::Costs::Part::Monks); Monks::Update(registry, grid, dt_ms); }
     { Core::Costs::Scope cost(Core::Costs::Part::Relics); Relics::Update(registry, grid, dt_ms); }
     { Core::Costs::Scope cost(Core::Costs::Part::Animals); Animals::Update(registry, grid, dt_ms); }
+    wild_trees::adopt(registry);
     { Core::Costs::Scope cost(Core::Costs::Part::Combat); Combat::Update(registry, grid, dt_ms); }
     { Core::Costs::Scope cost(Core::Costs::Part::Missiles); Missiles::Update(registry, grid, dt_ms); }
     { Core::Costs::Scope cost(Core::Costs::Part::Mortality); Mortality::Update(registry, grid, dt_ms); }

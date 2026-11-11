@@ -1,4 +1,4 @@
-#include "verify/Harness.h"
+﻿#include "verify/Harness.h"
 
 #include <cmath>
 #include <cstdio>
@@ -7,10 +7,12 @@
 #include "core/Command.h"
 #include "core/CommandQueue.h"
 #include "core/ConfigManager.h"
+#include "core/Treeman.h"
 #include "ecs/Mortality.h"
 #include "ecs/Simulation.h"
 #include "ecs/Units.h"
 #include "ecs/components/Combat.h"
+#include "ecs/components/Identity.h"
 #include "ecs/components/Transform.h"
 
 namespace Verify {
@@ -30,6 +32,10 @@ bool CheckCarryOn() {
     ECS::Simulation sim;
     sim.Init();
     auto& reg = sim.GetRegistry();
+    // This route fixture has exactly one foe; ambient recruits would add attackers.
+    for (const auto entity : reg.view<C::Identity>()) {
+        if (reg.get<C::Identity>(entity).unit_id == Core::treeman::wildUnitId) reg.destroy(entity);
+    }
     auto& grid = sim.GetGrid();
     auto& cfg = Core::ConfigManager::Get();
     const char* verdict = nullptr;
@@ -66,10 +72,14 @@ bool CheckCarryOn() {
         ECS::Mortality::Kill(reg, grid, foe);
         for (int t = 0; t < 20 * kTicksPerSecond; ++t) sim.Update(16);
         for (auto e : soldiers) {
+            if (!reg.all_of<C::Transform>(e)) {
+                verdict = "a route-test soldier died before its arrival was measured";
+                break;
+            }
             const auto& p = reg.get<C::Transform>(e).position;
             mean += std::hypot(p.x.ToFloat() - (ox + 8), p.y.ToFloat() - (oy + 3)) / kSoldiers;
         }
-        if (mean > 2.5) verdict = "soldiers whose target fell before they reached it stopped short of where it fell";
+        if (verdict == nullptr && mean > 2.5) verdict = "soldiers whose target fell before they reached it stopped short of where it fell";
     }
     std::printf("carryon=%s mean=%.1f\n", verdict == nullptr ? "ok" : verdict, mean);
     return verdict == nullptr;

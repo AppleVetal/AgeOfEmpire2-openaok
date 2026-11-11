@@ -1,4 +1,4 @@
-#include "verify/Harness.h"
+﻿#include "verify/Harness.h"
 
 #include <cmath>
 #include <cstdio>
@@ -7,10 +7,12 @@
 #include "core/Command.h"
 #include "core/CommandQueue.h"
 #include "core/ConfigManager.h"
+#include "core/Treeman.h"
 #include "ecs/Simulation.h"
 #include "ecs/Units.h"
 #include "ecs/components/Combat.h"
 #include "ecs/components/Health.h"
+#include "ecs/components/Identity.h"
 #include "ecs/components/Path.h"
 #include "ecs/components/Transform.h"
 
@@ -32,6 +34,10 @@ bool CheckSetOff() {
     ECS::Simulation sim;
     sim.Init();
     auto& reg = sim.GetRegistry();
+    // This route fixture has exactly one foe; ambient recruits would add attackers.
+    for (const auto entity : reg.view<C::Identity>()) {
+        if (reg.get<C::Identity>(entity).unit_id == Core::treeman::wildUnitId) reg.destroy(entity);
+    }
     auto& grid = sim.GetGrid();
     auto& cfg = Core::ConfigManager::Get();
     const char* verdict = nullptr;
@@ -78,12 +84,16 @@ bool CheckSetOff() {
         }
         const auto& at = reg.get<C::Transform>(foe).position;
         for (auto e : soldiers) {
+            if (!reg.all_of<C::Transform>(e)) {
+                verdict = "a route-test soldier died before its arrival was measured";
+                break;
+            }
             const auto& p = reg.get<C::Transform>(e).position;
             if (std::hypot((p.x - at.x).ToFloat(), (p.y - at.y).ToFloat()) <= 8.0) ++near;
         }
-        if (routed < kSoldiers) {
+        if (verdict == nullptr && routed < kSoldiers) {
             verdict = "soldiers set on one enemy waited their turn for a route rather than all setting off";
-        } else if (near < kSoldiers) {
+        } else if (verdict == nullptr && near < kSoldiers) {
             verdict = "soldiers set on one enemy did not all come up to it";
         }
     }

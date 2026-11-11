@@ -79,7 +79,9 @@ namespace Core::content
       "original/Data/graphics.drs", "original/Data/interfac.drs",
       "original/Data/terrain.drs", "original/Data/sounds.drs",
       "../mods/worldcraft/manifest.json", "../mods/worldcraft/rules.json",
-      "../mods/worldcraft/graphics.json", "../mods/worldcraft/strings.ru.json"
+      "../mods/worldcraft/graphics.json", "../mods/worldcraft/strings.ru.json",
+      "../mods/worldcraft/treeman/unit.json", "../mods/worldcraft/treeman/graphics.json",
+      "../mods/worldcraft/treeman/animations.json", "../mods/worldcraft/treeman/walking-tree.drs"
     };
     Identity candidate;
     if (!compute(assets, files, candidate, error)) return false;

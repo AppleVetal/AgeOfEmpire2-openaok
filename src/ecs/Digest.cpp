@@ -127,6 +127,7 @@ uint64_t Of(const Simulation& simulation)
     mix(job.workedMs.value); mix(job.growthLeftMs); mix(job.hasBlocked);
     mix(job.targetElevation);
     mix(job.rise); mix(job.clearanceWaitMs);
+    mix(job.paidGold);
   }
   nodes.clear();
   for (const auto entity : registry.view<const Components::WorldJobQueue>()) nodes.push_back(entity);

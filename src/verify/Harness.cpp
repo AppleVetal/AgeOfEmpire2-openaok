@@ -24,6 +24,7 @@ int Run(int ticks) {
         return wanted.empty() || wanted.find("," + std::string(name) + ",") != std::string::npos;
     };
     bool ok = true;
+    if (runs("treeman")) ok &= CheckTreeman();
     if (runs("worldjobs")) ok &= CheckWorldJobs();
     if (runs("earthworks")) ok &= CheckEarthworks();
     if (runs("earthnet")) ok &= CheckEarthworksNetwork();

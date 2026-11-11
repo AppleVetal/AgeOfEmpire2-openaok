@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
@@ -14,6 +14,7 @@
 
 namespace Core {
 
+// Загружает игровые данные и предоставляет таблицы графики, анимаций и интерфейса.
 class ConfigManager {
 public:
     static ConfigManager& Get() {
@@ -631,6 +632,49 @@ public:
             if (it != building_art.end()) return it->second;
         }
         return BuildingArt{};
+    }
+
+    // Native add-on records are registered before any simulation is created.
+    void RegisterGraphic(const GraphicInfo& info, int frameMs, int flags) {
+        if (static_cast<size_t>(info.graphic_id) >= graphic_info.size())
+            graphic_info.resize(static_cast<size_t>(info.graphic_id) + 1);
+        graphic_info[info.graphic_id] = info;
+        frame_ms[info.graphic_id] = frameMs;
+        sequences[info.graphic_id] = {0, flags};
+    }
+
+    bool RegisterUnit(int id, const Rules::UnitRules& rules, const Rules::UnitText& text,
+                      const std::string& help) {
+        const auto key = std::to_string(id);
+        if (id < 0 || units_json.contains(key) || unit_by_name.contains(text.name)) return false;
+        units_json[key] = {{"id", id}, {"name", text.name}, {"type", rules.type},
+            {"idle_graphic0", rules.standing_graphic}, {"walking_graphic0", rules.walking_graphic},
+            {"dying_graphic", rules.dying_graphic}};
+        unit_by_name.emplace(text.name, key);
+        attack_graphic[id] = rules.attack_graphic;
+        UnitInterface ui;
+        ui.name = text.label;
+        ui.help = help;
+        ui.hp = rules.hp;
+        ui.attack = Rules::ClassValue(rules.attacks, rules.attack_count, 4, 0);
+        ui.melee_armour = Rules::ClassValue(rules.armours, rules.armour_count, 4, 0);
+        ui.pierce_armour = Rules::ClassValue(rules.armours, rules.armour_count, 3, 0);
+        ui.line_of_sight = rules.los.ToInt();
+        ui.unit_type = rules.type;
+        ui.unit_class = rules.cls;
+        ui.dead_unit = rules.dead_unit;
+        ui.train_time = rules.train_time;
+        ui.outline_x = rules.size_x.ToFloat();
+        ui.outline_y = rules.size_y.ToFloat();
+        ui.hp_bar_height = 5.2f;
+        for (int i = 0; i < rules.cost_count; ++i) {
+            const auto& cost = rules.costs[i];
+            const auto stock = Rules::StockpileOf(cost.resource);
+            if (cost.paid && stock != ResourceType::COUNT) ui.costs[static_cast<int>(stock)] = cost.amount;
+            if (!cost.paid && cost.resource == Rules::Res::PopulationHeadroom) ui.population = cost.amount;
+        }
+        unit_interface.emplace(id, std::move(ui));
+        return true;
     }
 
     // The display name, or an empty string when the data has none for it.

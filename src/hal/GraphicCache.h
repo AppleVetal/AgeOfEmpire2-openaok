@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <algorithm>
 #include <array>
 #include <SDL2/SDL.h>
@@ -111,6 +111,7 @@ struct ArtPlace {
 };
 
 // Decodes SLPs out of the DRS archives and packs them into atlases.
+// Загружает игровые архивы и размещает графику на общих страницах текстур.
 class GraphicCache {
 public:
     static GraphicCache& Get() {
@@ -132,6 +133,7 @@ public:
     // name their own in their .sin file, so an atlas is built per art and
     // palette.
     static constexpr uint32_t kGamePalette = 50500;
+    bool OpenWorldPack(const std::string& path);
     bool OpenInterface(const std::string& drs_path);
     const GraphicAtlas* GetInterfaceAtlas(uint32_t slp_id, uint32_t palette_id = kGamePalette);
     SDL_Texture* GetInterfacePlayerLayer(uint32_t slp_id, int player);
@@ -287,6 +289,8 @@ private:
 
     SDL_Renderer* sdl_renderer = nullptr;
     DrsArchive drs;
+    DrsArchive worldPack;
+    const DrsArchive& WorldSource(uint32_t slp) const;
     std::vector<PaletteColor> palette;
     std::vector<int> player_ramps;
     std::array<int, 16> colour_slots{-1, -1, -1, -1, -1, -1, -1, -1,

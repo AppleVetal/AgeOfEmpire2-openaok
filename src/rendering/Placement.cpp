@@ -13,6 +13,7 @@
 #include "ecs/WorldJobs.h"
 #include "ecs/Earthworks.h"
 #include "core/Worldcraft.h"
+#include "core/Treeman.h"
 #include "hal/Window.h"
 #include "rendering/Ground.h"
 #include "rendering/Renderer.h"
@@ -106,11 +107,13 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
         const auto tiles = ECS::world_jobs::layout(grid, plantFromX, plantFromY, tile_x, tile_y, plantShape);
         const auto& rules = Core::worldcraft::plantRules();
         const auto kind = Core::InputManager::Get().workKind();
-        const auto art = cfg.GetUnitGraphicById(Core::isEarthwork(kind) ? rules.siteUnit : rules.growingUnit, "idle_graphic0");
+        const auto art = cfg.GetUnitGraphicById(kind == Core::WorldJobKind::GrowTreeman ? Core::treeman::unitId :
+            Core::isEarthwork(kind) ? rules.siteUnit : rules.growingUnit, "idle_graphic0");
         const Core::PlantLayoutCommand plan{{}, plantFromX, plantFromY, tile_x, tile_y, plantShape, false, viewer, kind,
             Core::InputManager::Get().workHeight()};
         const auto* player = ECS::Players::Find(registry, viewer);
         int wood = player != nullptr ? ECS::Players::Stock(*player, Core::ResourceType::Wood) : 0;
+        int gold = player != nullptr ? ECS::Players::Stock(*player, Core::ResourceType::Gold) : 0;
         for (const auto& [x, y] : tiles) {
             const int levels = ECS::world_jobs::layoutLevels(plan, x, y);
             const bool allowed = Core::isEarthwork(kind) ? ECS::earthworks::canWork(registry, grid, viewer, x, y, kind, levels) :
@@ -118,8 +121,9 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
             const int steps = Core::isEarthwork(kind) ?
                 std::max(1, std::abs(ECS::earthworks::targetLevel(grid.GetTile(x, y), kind, levels) - grid.GetTile(x, y).elevation)) : 1;
             const int cost = Core::worldcraft::workRules(kind).woodCost * steps;
-            const bool clear = allowed && wood >= cost;
-            if (clear) wood -= cost;
+            const int goldCost = Core::worldcraft::workRules(kind).goldCost;
+            const bool clear = allowed && wood >= cost && gold >= goldCost;
+            if (clear) { wood -= cost; gold -= goldCost; }
             if (Core::isEarthwork(kind)) {
                 Piece piece;
                 piece.wx = static_cast<float>(x); piece.wy = static_cast<float>(y);

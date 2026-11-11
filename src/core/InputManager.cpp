@@ -32,6 +32,7 @@
 #include "core/ConfigManager.h"
 #include "core/Hotkeys.h"
 #include "core/Strings.h"
+#include "core/Treeman.h"
 #include "ecs/Garrisons.h"
 #include "ecs/Relics.h"
 #include "ecs/Trade.h"
@@ -931,6 +932,10 @@ void InputManager::UpdateIntent(ECS::Simulation& sim, Rendering::Renderer& rende
         } else if (!anyone) {
             Rendering::UIRenderer::SetWorldHint(resource_hint(false));
         }
+        return;
+    }
+    if (identity != nullptr && identity->unit_id == treeman::wildUnitId && gaia) {
+        Rendering::UIRenderer::setWorldUnitHint(treeman::wildUnitId);
         return;
     }
     // Sheep, Gaia's or the player's: villagers herd them in for food.

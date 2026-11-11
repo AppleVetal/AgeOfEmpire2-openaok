@@ -4,6 +4,9 @@
 #include <vector>
 #include "core/ConfigManager.h"
 #include "core/Worldcraft.h"
+#include "core/Treeman.h"
+#include "ecs/Population.h"
+#include "ecs/Units.h"
 #include "ecs/Buildings.h"
 #include "ecs/Earthworks.h"
 #include "ecs/Fog.h"
@@ -55,7 +58,9 @@ namespace ECS::world_jobs
       c::Sprite sprite;
       sprite.slp_id = art.slp_id;
       sprite.still = true;
-      sprite.angles = 1;
+      sprite.angles = unit == Core::treeman::unitId ? art.angle_count : 1;
+      sprite.frames_per_angle = unit == Core::treeman::unitId ? art.frame_count : 1;
+      sprite.is_file_sprite = unit == Core::treeman::unitId;
       registry.emplace_or_replace<c::Sprite>(entity, sprite);
       registry.emplace_or_replace<c::Identity>(entity, unit);
     }
@@ -150,7 +155,8 @@ namespace ECS::world_jobs
       const int cost = work.woodCost * steps;
       auto* player = Players::Find(registry, command.player);
       if (active >= activeSiteLimit || player == nullptr ||
-          Players::Stock(*player, Core::ResourceType::Wood) < cost) return false;
+          Players::Stock(*player, Core::ResourceType::Wood) < cost ||
+          Players::Stock(*player, Core::ResourceType::Gold) < work.goldCost) return false;
       site = registry.create();
       const c::Vector2D at{Fixed32(command.tileX), Fixed32(command.tileY)};
       registry.emplace<c::Transform>(site, at, at);
@@ -160,6 +166,7 @@ namespace ECS::world_jobs
       registry.emplace<c::WorldJob>(site, c::WorldJob{command.kind, c::WorldJobPhase::Working,
         command.tileX, command.tileY, cost, work.workMs * steps, {}, isEarthwork ? 0 : rules.growthMs, false, targetLevel,
         isEarthwork && command.kind == Core::WorldJobKind::RaiseGround ? steps : 1});
+      registry.get<c::WorldJob>(site).paidGold = work.goldCost;
       if (isEarthwork)
       {
         c::Sprite marker;
@@ -169,8 +176,9 @@ namespace ECS::world_jobs
         registry.emplace<c::Sprite>(site, marker);
         registry.emplace<c::Identity>(site, rules.siteUnit);
       }
-      else showArt(registry, site, rules.siteUnit);
+      else showArt(registry, site, command.kind == Core::WorldJobKind::GrowTreeman ? Core::treeman::unitId : rules.siteUnit);
       Players::AddStock(*player, Core::ResourceType::Wood, -cost);
+      Players::AddStock(*player, Core::ResourceType::Gold, -work.goldCost);
     }
     for (const auto worker : crew)
     {
@@ -237,7 +245,12 @@ namespace ECS::world_jobs
       const int refund = (Fixed32(job.paidWood) *
         (Fixed32(1) - job.workedMs / Fixed32(job.workMs))).ToInt();
       if (auto* seat = Players::Find(registry, player))
+      {
         Players::AddStock(*seat, Core::ResourceType::Wood, refund);
+        const int gold = (Fixed32(job.paidGold) *
+          (Fixed32(1) - job.workedMs / Fixed32(job.workMs))).ToInt();
+        Players::AddStock(*seat, Core::ResourceType::Gold, gold);
+      }
     }
     Fog::Going(registry, site);
     if (job.hasBlocked) grid.SetWalkable(job.tileX, job.tileY, true);
@@ -350,6 +363,17 @@ namespace ECS::world_jobs
           job.clearanceWaitMs = 1000;
           continue;
         }
+        Fog::Going(registry, site);
+        registry.destroy(site);
+        continue;
+      }
+      if (job.kind == Core::WorldJobKind::GrowTreeman)
+      {
+        if (!Population::HasRoom(registry, player, Core::treeman::settings().population)) continue;
+        const c::Vector2D at{Fixed32(job.tileX), Fixed32(job.tileY)};
+        const auto unit = Units::Spawn(registry, Core::treeman::unitId, player, at);
+        if (unit == entt::null) continue;
+        grid.SetWalkable(job.tileX, job.tileY, true);
         Fog::Going(registry, site);
         registry.destroy(site);
         continue;

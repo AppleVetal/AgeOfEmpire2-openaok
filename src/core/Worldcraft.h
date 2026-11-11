@@ -25,11 +25,12 @@ namespace Core::worldcraft
     int buttonIcon = -1;
   };
 
-  // Задаёт стоимость и трудозатраты одного уровня земляных работ.
+  // Задаёт стоимость и трудозатраты работы на одном участке или уровне рельефа.
   struct WorkRules
   {
     int woodCost = 0;
     int workMs = 0;
+    int goldCost = 0;
   };
 
   bool load(const std::filesystem::path& root, std::string& error);

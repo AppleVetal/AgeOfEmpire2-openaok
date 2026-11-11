@@ -18,7 +18,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TICKS=3000
-GOLDEN="entities=1970 ticks=3000 hash=221acd07913e73ac"
+GOLDEN="entities=1980 ticks=3000 hash=81c5afed8b236eaa"
 
 # Build first; stop on failure.
 if ! "$ROOT/build.sh" >/dev/null 2>&1; then
@@ -1175,6 +1175,12 @@ EARTHWORKS=$(echo "$OUTPUT" | grep '^earthworks=')
 EARTHNET=$(echo "$OUTPUT" | grep '^earthnet=')
 if [ "$EARTHWORKS" != "earthworks=ok" ] || [ "$EARTHNET" != "earthnet=ok" ]; then
     echo "EARTHWORKS FAILED: $EARTHWORKS; $EARTHNET" >&2
+    STATUS=1
+fi
+
+TREEMAN=$(echo "$OUTPUT" | grep '^treeman=')
+if [ "$TREEMAN" != "treeman=ok" ]; then
+    echo "TREEMAN FAILED: $TREEMAN" >&2
     STATUS=1
 fi
 

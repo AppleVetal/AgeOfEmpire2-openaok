@@ -1,0 +1,42 @@
+{
+  "59000": {
+    "name": "WALKTREE_IDLE",
+    "filename": "WT_IDLE",
+    "slp_id": 59000,
+    "frame_count": 1,
+    "angle_count": 8,
+    "layer": 20
+  },
+  "59001": {
+    "name": "WALKTREE_WALK",
+    "filename": "WT_WALK",
+    "slp_id": 59001,
+    "frame_count": 15,
+    "angle_count": 8,
+    "layer": 20
+  },
+  "59002": {
+    "name": "WALKTREE_ATTACK",
+    "filename": "WT_ATTACK",
+    "slp_id": 59002,
+    "frame_count": 20,
+    "angle_count": 8,
+    "layer": 20
+  },
+  "59003": {
+    "name": "WALKTREE_DIE",
+    "filename": "WT_DIE",
+    "slp_id": 59003,
+    "frame_count": 15,
+    "angle_count": 8,
+    "layer": 20
+  },
+  "59004": {
+    "name": "WALKTREE_CORPSE",
+    "filename": "WT_CORPSE",
+    "slp_id": 59004,
+    "frame_count": 1,
+    "angle_count": 8,
+    "layer": 20
+  }
+}
