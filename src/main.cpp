@@ -18,6 +18,7 @@
 #include "core/Command.h"
 #include "core/ContentIdentity.h"
 #include "core/Worldcraft.h"
+#include "core/Treeman.h"
 #include "core/CommandQueue.h"
 #include "verify/AIGame.h"
 #include "verify/Harness.h"
@@ -237,7 +238,8 @@ bool LoadData() {
     // The game's text, by string id.
     Core::Strings::Load("../assets/extracted_data/strings.json");
     Core::Hotkeys::Load("../assets/extracted_data/hotkeys.json");
-    if (!Core::worldcraft::validateArt(contentError))
+    if (!Core::treeman::load("../mods/worldcraft/treeman", contentError) ||
+        !Core::worldcraft::validateArt(contentError))
     {
       std::cerr << "[Worldcraft] " << contentError << std::endl;
       return false;
@@ -1920,6 +1922,11 @@ int main(int argc, char* argv[]) {
                                        "../assets/original/Data/graphics.drs",
                                        "../assets/original/interfac_extracted/50500.bina")) {
         std::cerr << "[App] Failed to open graphics.drs." << std::endl;
+        return -1;
+    }
+
+    if (!HAL::GraphicCache::Get().OpenWorldPack(Core::treeman::archivePath)) {
+        std::cerr << "[App] Failed to load the walking tree graphics archive (missing or colliding ids)." << std::endl;
         return -1;
     }
 

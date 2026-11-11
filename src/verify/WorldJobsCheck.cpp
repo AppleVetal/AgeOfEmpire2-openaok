@@ -115,6 +115,7 @@ namespace Verify
       int plantingButtons = 0;
       for (int i = 0; i < buttonCount; ++i)
         if (buttons[i].kind == Rendering::UIRenderer::CommandKind::PlantTree &&
+            buttons[i].jobKind == Core::WorldJobKind::PlantTree &&
             !Rendering::UIRenderer::CommandHelp(sim, buttons[i]).empty()) ++plantingButtons;
       if (plantingButtons != 2) return "the villager is missing line or area planting buttons";
       auto& seat = *ECS::Players::Find(registry, 1);

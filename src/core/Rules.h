@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -431,6 +431,9 @@ struct Tables {
 
 // Reads rules.json. False if it could not be read.
 bool Load(const std::string& path);
+
+// Adds an unused unit slot before player tables are copied from these rules.
+bool RegisterUnit(int id, const UnitRules& rules, const UnitText& text);
 
 // Whether a unit of terrain restriction `restriction` may go on, or a building
 // of it stand on, the dat terrain `terrain`. Unknown pairs are refused.

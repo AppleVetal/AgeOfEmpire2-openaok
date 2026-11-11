@@ -1,4 +1,4 @@
-#include "rendering/Alerts.h"
+﻿#include "rendering/Alerts.h"
 
 #include <algorithm>
 #include <array>
@@ -11,6 +11,7 @@
 #include "core/ConfigManager.h"
 #include "core/Rules.h"
 #include "core/Strings.h"
+#include "core/Treeman.h"
 #include "ecs/BuildingGeometry.h"
 #include "ecs/Events.h"
 #include "ecs/Flares.h"
@@ -162,11 +163,18 @@ void Take(const entt::registry& registry, const ECS::Events::Event& event, Core:
         Raise(maker, WhereIs(registry, maker, event.at));
         return;
     }
-    case ECS::Events::Kind::Claimed:
+    case ECS::Events::Kind::Claimed: {
         if (event.player != viewer || out) return;
-        Caption(kSheepFound);
+        const auto* identity = registry.try_get<ECS::Components::Identity>(event.subject);
+        if (identity != nullptr && (identity->unit_id == Core::treeman::unitId ||
+            identity->unit_id == Core::treeman::wildUnitId)) {
+            if (UIRenderer::HelpShown()) Messages::Post(Core::treeman::settings().m_claimedNotice);
+        } else {
+            Caption(kSheepFound);
+        }
         Raise(event.subject, event.at);
         return;
+    }
     case ECS::Events::Kind::Exhausted: {
         // A farm is the villager's to build; the fishing ship's is a fish
         // trap.

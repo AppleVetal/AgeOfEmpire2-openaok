@@ -1,4 +1,4 @@
-#include "GraphicCache.h"
+﻿#include "GraphicCache.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -93,6 +93,7 @@ bool GraphicCache::Init(SDL_Renderer* renderer,
 }
 
 void GraphicCache::Shutdown() {
+    worldPack = {};
     for (auto& pool : pages) {
         for (Page& page : pool) SDL_DestroyTexture(page.texture);
         pool.clear();
@@ -135,7 +136,23 @@ void GraphicCache::LimitTextureSide(int side) {
 }
 
 const GraphicAtlas* GraphicCache::GetAtlas(uint32_t slp_id) {
-    return AtlasFrom(drs, atlases, slp_id, slp_id, palette, false);
+    return AtlasFrom(WorldSource(slp_id), atlases, slp_id, slp_id, palette, false);
+}
+
+const DrsArchive& GraphicCache::WorldSource(uint32_t slp) const {
+    return worldPack.entries.contains(slp) ? worldPack : drs;
+}
+
+bool GraphicCache::OpenWorldPack(const std::string& path) {
+    if (!ready || !worldPack.entries.empty()) return false;
+    DrsArchive candidate;
+    if (!DrsOpen(path, candidate) || candidate.entries.empty()) return false;
+    for (const auto& [id, entry] : candidate.entries) {
+        (void)entry;
+        if (drs.entries.contains(id) || atlases.contains(id)) return false;
+    }
+    worldPack = std::move(candidate);
+    return true;
 }
 
 template <typename Key>
@@ -270,7 +287,7 @@ ArtPlace GraphicCache::Outline(uint32_t slp_id) {
 ArtPlace GraphicCache::LayerPlace(Pool pool, uint32_t slp_id, Layer layer, int player) {
     const GraphicAtlas* geometry = GetAtlas(slp_id);
     if (geometry == nullptr) return {};
-    SDL_Surface* block = DrawLayer(drs, slp_id, *geometry, layer, player, palette, kPadding);
+    SDL_Surface* block = DrawLayer(WorldSource(slp_id), slp_id, *geometry, layer, player, palette, kPadding);
     if (block == nullptr) return {};
     const int most = pool == Pool::Art ? largest_side : page_side;
     return block->h <= most ? Place(pool, block, kPadding) : PlaceBands(pool, block, *geometry, most);

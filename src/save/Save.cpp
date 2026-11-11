@@ -70,7 +70,7 @@ namespace C = ECS::Components;
 
 constexpr char kMagic[8] = {'A', 'O', 'K', 'C', 'S', 'A', 'V', 'E'};
 // The save format's version; a save of any other version is refused.
-constexpr uint32_t kVersion = 15;
+constexpr uint32_t kVersion = 16;
 
 // Plain data goes out as it lies in memory.
 template <typename T>
@@ -121,6 +121,9 @@ void Get(Reader& r, C::WorldJob& job) {
         (job.phase != C::WorldJobPhase::Working && job.phase != C::WorldJobPhase::Growing) ||
         job.workMs < 16 || job.workMs > 12000000 || job.workedMs.value < 0 ||
         job.workedMs > Core::Fixed32(job.workMs) || job.paidWood < 0 || job.paidWood > 40000 ||
+        job.paidGold < 0 || job.paidGold > 10000 ||
+        (job.kind != Core::WorldJobKind::GrowTreeman && job.paidGold != 0) ||
+        (job.kind == Core::WorldJobKind::GrowTreeman && job.phase != C::WorldJobPhase::Working) ||
         job.growthLeftMs < 0 || job.growthLeftMs > 3600000 ||
         job.targetElevation < Physics::earthworkMinLevel || job.targetElevation > Physics::earthworkMaxLevel ||
         job.rise < 1 || job.rise > Physics::earthworkMaxLevel || job.clearanceWaitMs < 0 || job.clearanceWaitMs > 1000 ||

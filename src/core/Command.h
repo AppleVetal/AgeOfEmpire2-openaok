@@ -372,7 +372,7 @@ struct DisbandCommand {
     PlayerId player;
 };
 
-enum class WorldJobKind : uint8_t { PlantTree = 1, RaiseGround, DigDitch, RestoreGround, DigChannel, DigLake };
+enum class WorldJobKind : uint8_t { PlantTree = 1, RaiseGround, DigDitch, RestoreGround, DigChannel, DigLake, GrowTreeman };
 
 constexpr int hillHeight = 4;
 constexpr int mountainHeight = 12;
@@ -390,7 +390,7 @@ constexpr bool isEarthwork(WorldJobKind kind)
 
 constexpr bool isWorldJobKind(WorldJobKind kind)
 {
-  return kind == WorldJobKind::PlantTree || isEarthwork(kind);
+  return kind == WorldJobKind::PlantTree || kind == WorldJobKind::GrowTreeman || isEarthwork(kind);
 }
 
 // Передаёт приказ группе жителей выполнить или поставить в очередь работу на клетке.

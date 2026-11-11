@@ -261,6 +261,7 @@ public:
     // A line of help for the lower-left corner, set by whoever knows what the
     // cursor is over in the world; cleared every frame.
     static void SetWorldHint(int string_id);
+    static void setWorldUnitHint(int unitId);
 
     // A top bar button was clicked: the screen it opens is the screens'
     // business, which collects the request here. -1 when there is none.

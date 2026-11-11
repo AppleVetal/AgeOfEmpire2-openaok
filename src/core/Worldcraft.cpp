@@ -8,6 +8,7 @@
 
 #include "core/ConfigManager.h"
 #include "core/Rules.h"
+#include "core/Treeman.h"
 
 namespace Core::worldcraft
 {
@@ -41,7 +42,7 @@ namespace Core::worldcraft
     {
       const auto manifest = read(root / "manifest.json");
       if (manifest.at("schema") != 1 || manifest.at("id") != "worldcraft" ||
-          manifest.at("version") != "0.3.0" || manifest.at("rules") != "rules.json" ||
+          manifest.at("version") != "0.3.1" || manifest.at("rules") != "rules.json" ||
           manifest.at("graphics") != "graphics.json" || manifest.at("strings") != "strings.ru.json")
         throw std::runtime_error("unsupported worldcraft manifest");
       const auto allRules = read(root / "rules.json");
@@ -127,6 +128,11 @@ namespace Core::worldcraft
 
   WorkRules workRules(WorldJobKind kind)
   {
+    if (kind == WorldJobKind::GrowTreeman)
+    {
+      const auto& unit = treeman::settings();
+      return {unit.woodCost, unit.workMs, unit.goldCost};
+    }
     if (kind == WorldJobKind::PlantTree) return {loaded.woodCost, loaded.workMs};
     if (!isEarthwork(kind)) throw std::invalid_argument("invalid worldcraft job kind");
     return earthRules.at(static_cast<std::size_t>(kind) - static_cast<std::size_t>(WorldJobKind::RaiseGround));
@@ -136,6 +142,7 @@ namespace Core::worldcraft
   {
     switch (kind)
     {
+    case WorldJobKind::GrowTreeman: return treeman::settings().grow;
     case WorldJobKind::RaiseGround: return text("raise_ground");
     case WorldJobKind::DigDitch: return text("dig_ditch");
     case WorldJobKind::RestoreGround: return text("restore_ground");

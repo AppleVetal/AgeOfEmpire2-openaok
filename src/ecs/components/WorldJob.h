@@ -23,6 +23,7 @@ namespace ECS::Components
     int32_t targetElevation = 0;
     int32_t rise = 1;
     int32_t clearanceWaitMs = 0;
+    int32_t paidGold = 0;
   };
 
   constexpr std::size_t worldJobQueueLimit = 256;
