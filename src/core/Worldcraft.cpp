@@ -42,7 +42,7 @@ namespace Core::worldcraft
     {
       const auto manifest = read(root / "manifest.json");
       if (manifest.at("schema") != 1 || manifest.at("id") != "worldcraft" ||
-          manifest.at("version") != "0.3.1" || manifest.at("rules") != "rules.json" ||
+          manifest.at("version") != "0.4.0" || manifest.at("rules") != "rules.json" ||
           manifest.at("graphics") != "graphics.json" || manifest.at("strings") != "strings.ru.json")
         throw std::runtime_error("unsupported worldcraft manifest");
       const auto allRules = read(root / "rules.json");

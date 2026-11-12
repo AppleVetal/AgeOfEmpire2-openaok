@@ -25,7 +25,7 @@ VIAddVersionKey /LANG=1049 "LegalCopyright" "OpenAoK contributors; game data bel
 
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Установка OpenAoK Worldcraft"
-!define MUI_WELCOMEPAGE_TEXT "Жители могут выращивать лес, поднимать горы, рыть сухие рвы и восстанавливать землю: линией или областью.$\r$\n$\r$\nИгровые данные включены. После установки запускайте игру с ярлыка.$\r$\n$\r$\nWindows 10/11, 64 бита. Средства разработки и интернет для одиночной игры не требуются."
+!define MUI_WELCOMEPAGE_TEXT "Worldcraft ${APP_VERSION}: жители прокладывают реки и водяные рвы, выращивают лес и древней, поднимают горы и восстанавливают землю: линией или областью.$\r$\n$\r$\nИгровые данные включены. После установки запускайте игру с ярлыка.$\r$\n$\r$\nWindows 10/11, 64 бита. Средства разработки и интернет для одиночной игры не требуются."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
