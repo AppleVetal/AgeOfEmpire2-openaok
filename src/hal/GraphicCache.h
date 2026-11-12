@@ -289,7 +289,7 @@ private:
 
     SDL_Renderer* sdl_renderer = nullptr;
     DrsArchive drs;
-    DrsArchive worldPack;
+    std::vector<DrsArchive> m_worldPacks;
     const DrsArchive& WorldSource(uint32_t slp) const;
     std::vector<PaletteColor> palette;
     std::vector<int> player_ramps;

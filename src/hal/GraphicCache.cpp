@@ -93,7 +93,7 @@ bool GraphicCache::Init(SDL_Renderer* renderer,
 }
 
 void GraphicCache::Shutdown() {
-    worldPack = {};
+    m_worldPacks.clear();
     for (auto& pool : pages) {
         for (Page& page : pool) SDL_DestroyTexture(page.texture);
         pool.clear();
@@ -140,18 +140,22 @@ const GraphicAtlas* GraphicCache::GetAtlas(uint32_t slp_id) {
 }
 
 const DrsArchive& GraphicCache::WorldSource(uint32_t slp) const {
-    return worldPack.entries.contains(slp) ? worldPack : drs;
+    for (const auto& pack : m_worldPacks)
+      if (pack.entries.contains(slp)) return pack;
+    return drs;
 }
 
 bool GraphicCache::OpenWorldPack(const std::string& path) {
-    if (!ready || !worldPack.entries.empty()) return false;
+    if (!ready) return false;
     DrsArchive candidate;
     if (!DrsOpen(path, candidate) || candidate.entries.empty()) return false;
     for (const auto& [id, entry] : candidate.entries) {
         (void)entry;
         if (drs.entries.contains(id) || atlases.contains(id)) return false;
+        for (const auto& pack : m_worldPacks)
+          if (pack.entries.contains(id)) return false;
     }
-    worldPack = std::move(candidate);
+    m_worldPacks.push_back(std::move(candidate));
     return true;
 }
 

@@ -9,6 +9,7 @@
 #include "core/ConfigManager.h"
 #include "core/Rules.h"
 #include "core/Treeman.h"
+#include "core/TrojanHorse.h"
 
 namespace Core::worldcraft
 {
@@ -127,12 +128,27 @@ namespace Core::worldcraft
     return strings.at(key);
   }
 
+  int builtUnit(WorldJobKind kind)
+  {
+    return kind == WorldJobKind::BuildTransport ? trojan_horse::unitId : treeman::unitId;
+  }
+
+  int builtPopulation(WorldJobKind kind)
+  {
+    return kind == WorldJobKind::BuildTransport ? trojan_horse::settings().m_population : treeman::settings().population;
+  }
+
   WorkRules workRules(WorldJobKind kind)
   {
     if (kind == WorldJobKind::GrowTreeman)
     {
       const auto& unit = treeman::settings();
       return {unit.woodCost, unit.workMs, unit.goldCost};
+    }
+    if (kind == WorldJobKind::BuildTransport)
+    {
+      const auto& unit = trojan_horse::settings();
+      return {unit.m_woodCost, unit.m_workMs, unit.m_goldCost};
     }
     if (kind == WorldJobKind::PlantTree) return {loaded.woodCost, loaded.workMs};
     if (!isEarthwork(kind)) throw std::invalid_argument("invalid worldcraft job kind");
@@ -144,6 +160,7 @@ namespace Core::worldcraft
   {
     switch (kind)
     {
+    case WorldJobKind::BuildTransport: return trojan_horse::settings().m_build;
     case WorldJobKind::GrowTreeman: return treeman::settings().grow;
     case WorldJobKind::RaiseGround: return text("raise_ground");
     case WorldJobKind::DigDitch: return text("dig_ditch");

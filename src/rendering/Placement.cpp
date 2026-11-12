@@ -106,7 +106,7 @@ bool Collect(ECS::Simulation& sim, const Renderer& renderer, std::vector<Piece>&
         Core::InputManager::Get().planting(plantFromX, plantFromY, plantShape);
         const auto& rules = Core::worldcraft::plantRules();
         const auto kind = Core::InputManager::Get().workKind();
-        const auto art = cfg.GetUnitGraphicById(kind == Core::WorldJobKind::GrowTreeman ? Core::treeman::unitId :
+        const auto art = cfg.GetUnitGraphicById(Core::isUnitConstruction(kind) ? Core::worldcraft::builtUnit(kind) :
             Core::isEarthwork(kind) ? rules.siteUnit : rules.growingUnit, "idle_graphic0");
         const Core::PlantLayoutCommand plan{{}, plantFromX, plantFromY, tile_x, tile_y, plantShape, false, viewer, kind,
             Core::InputManager::Get().workHeight(), Core::InputManager::Get().workWidth()};

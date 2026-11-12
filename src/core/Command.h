@@ -372,7 +372,7 @@ struct DisbandCommand {
     PlayerId player;
 };
 
-enum class WorldJobKind : uint8_t { PlantTree = 1, RaiseGround, DigDitch, RestoreGround, DigChannel, DigLake, GrowTreeman, DigRiver, DigWaterMoat };
+enum class WorldJobKind : uint8_t { PlantTree = 1, RaiseGround, DigDitch, RestoreGround, DigChannel, DigLake, GrowTreeman, DigRiver, DigWaterMoat, BuildTransport };
 
 constexpr bool isWaterwork(WorldJobKind kind)
 {
@@ -411,9 +411,14 @@ constexpr bool isEarthwork(WorldJobKind kind)
     kind == WorldJobKind::RestoreGround || kind == WorldJobKind::DigChannel || kind == WorldJobKind::DigLake || isWaterwork(kind);
 }
 
+constexpr bool isUnitConstruction(WorldJobKind kind)
+{
+  return kind == WorldJobKind::GrowTreeman || kind == WorldJobKind::BuildTransport;
+}
+
 constexpr bool isWorldJobKind(WorldJobKind kind)
 {
-  return kind == WorldJobKind::PlantTree || kind == WorldJobKind::GrowTreeman || isEarthwork(kind);
+  return kind == WorldJobKind::PlantTree || isUnitConstruction(kind) || isEarthwork(kind);
 }
 
 // Передаёт приказ группе жителей выполнить или поставить в очередь работу на клетке.

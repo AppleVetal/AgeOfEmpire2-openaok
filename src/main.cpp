@@ -19,6 +19,7 @@
 #include "core/ContentIdentity.h"
 #include "core/Worldcraft.h"
 #include "core/Treeman.h"
+#include "core/TrojanHorse.h"
 #include "core/CommandQueue.h"
 #include "verify/AIGame.h"
 #include "verify/Harness.h"
@@ -239,6 +240,7 @@ bool LoadData() {
     Core::Strings::Load("../assets/extracted_data/strings.json");
     Core::Hotkeys::Load("../assets/extracted_data/hotkeys.json");
     if (!Core::treeman::load("../mods/worldcraft/treeman", contentError) ||
+        !Core::trojan_horse::load("../mods/worldcraft/transport", contentError) ||
         !Core::worldcraft::validateArt(contentError))
     {
       std::cerr << "[Worldcraft] " << contentError << std::endl;
@@ -1925,8 +1927,9 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    if (!HAL::GraphicCache::Get().OpenWorldPack(Core::treeman::archivePath)) {
-        std::cerr << "[App] Failed to load the walking tree graphics archive (missing or colliding ids)." << std::endl;
+    if (!HAL::GraphicCache::Get().OpenWorldPack(Core::treeman::archivePath) ||
+        !HAL::GraphicCache::Get().OpenWorldPack(Core::trojan_horse::archivePath)) {
+        std::cerr << "[App] Failed to load a Worldcraft unit graphics archive (missing or colliding ids)." << std::endl;
         return -1;
     }
 

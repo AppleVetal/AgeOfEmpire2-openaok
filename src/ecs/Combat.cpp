@@ -1,4 +1,5 @@
-#include "ecs/Buildings.h"
+﻿#include "ecs/Buildings.h"
+#include "ecs/TransportCombat.h"
 #include "ecs/Combat.h"
 #include "ecs/Nearby.h"
 
@@ -834,6 +835,7 @@ void Face(entt::registry& registry, entt::entity self, entt::entity target) {
 // Both by the table the entity plays by: its owner's, or a converted unit's
 // maker's (Components::RulesOf).
 const R::UnitRules* FightingRules(const entt::registry& registry, entt::entity entity) {
+    if (const auto* battery = transport_combat::fightingRules(registry, entity)) return battery;
     return Players::RulesFor(registry, entity, Villagers::DisplayUnit(registry, entity));
 }
 
@@ -1086,6 +1088,7 @@ void Hurt(entt::registry& registry, Physics::Grid& grid, entt::entity target,
 }
 
 void Update(entt::registry& registry, Physics::Grid& grid, int32_t dt_ms) {
+    transport_combat::refreshAll(registry);
     if (auto* warnings = registry.ctx().find<Warnings>(); warnings != nullptr && !warnings->list.empty()) {
         const auto list = std::move(warnings->list);
         warnings->list.clear();
@@ -1126,7 +1129,10 @@ void Update(entt::registry& registry, Physics::Grid& grid, int32_t dt_ms) {
         const Core::PlayerId rules_player = makers.contains(self)   ? makers.get(self).player
                                             : owners.contains(self) ? owners.get(self).player_id
                                                                     : Core::PLAYER_GAIA;
-        const R::UnitRules* rules = Players::UnitOf(table, rules_player, Villagers::DisplayUnit(registry, self));
+        const bool isHorse = transport_combat::isHorse(registry, self);
+        const R::UnitRules* rules = isHorse ? FightingRules(registry, self) :
+            Players::UnitOf(table, rules_player, Villagers::DisplayUnit(registry, self));
+        if (isHorse && registry.all_of<Components::Landing>(self)) continue;
         if (rules == nullptr || rules->attack_count == 0) continue;
         const bool building = buildings.contains(self);
 

@@ -1,10 +1,12 @@
-#include "ecs/Garrisons.h"
+﻿#include "ecs/Garrisons.h"
+#include "ecs/TransportCombat.h"
 
 #include <algorithm>
 #include <vector>
 
 #include "core/FixedMath.h"
 #include "core/Rules.h"
+#include "core/TrojanHorse.h"
 #include "ecs/BuildingGeometry.h"
 #include "ecs/Buildings.h"
 #include "ecs/Combat.h"
@@ -117,9 +119,15 @@ bool CanGarrisonIn(const R::UnitRules& rules, int cls) {
     return false;
 }
 
-// A holder that is not a building: a transport ship.
-bool IsShip(const entt::registry& registry, entt::entity holder) {
+// A holder that moves: a ship or a land transport.
+bool isMobileHolder(const entt::registry& registry, entt::entity holder) {
     return !registry.all_of<Components::Building>(holder);
+}
+
+bool isLandTransport(const entt::registry& registry, entt::entity holder)
+{
+  const auto* identity = registry.try_get<Components::Identity>(holder);
+  return identity != nullptr && identity->unit_id == Core::trojan_horse::unitId;
 }
 
 // Units already heading in, so two sent at once cannot both take the last place.
@@ -135,7 +143,7 @@ int Incoming(const entt::registry& registry, entt::entity building) {
 // The ground a holder stands on: a building's footprint, a ship's body.
 Buildings::Bounds GroundOf(const entt::registry& registry, entt::entity building) {
     const auto& at = registry.get<Components::Transform>(building).position;
-    if (IsShip(registry, building)) {
+    if (isMobileHolder(registry, building)) {
         const R::UnitRules* rules = RulesOf(registry, building);
         const Core::Fixed32 r = rules != nullptr ? rules->size_x : Core::Fixed32(0);
         return {at.x - r, at.y - r, at.x + r, at.y + r};
@@ -212,11 +220,31 @@ int Disembark(entt::registry& registry, const Physics::Grid& grid, entt::entity 
     if (garrison == nullptr) return 0;
     const Buildings::Bounds hull = GroundOf(registry, ship);
     std::vector<Components::Vector2D> placed;
+    std::vector<Core::Fixed32> radii;
+    std::vector<Core::Fixed32> rooms;
+    const bool isLand = isLandTransport(registry, ship);
+    if (isLand)
+    {
+      const auto centre = registry.get<Components::Transform>(ship).position;
+      for (auto entity : registry.view<const Components::Transform, const Components::Health>())
+      {
+        if (entity == ship || !Combat::Alive(registry, entity)) continue;
+        const auto at = registry.get<Components::Transform>(entity).position;
+        if (Core::FixedMath::Distance(at.x - centre.x, at.y - centre.y) > Core::Fixed32(6)) continue;
+        placed.push_back(at);
+        radii.push_back(Navigation::RadiusOf(registry, entity));
+      }
+    }
     std::vector<entt::entity> still;
     const std::vector<entt::entity> aboard = garrison->inside;
     for (entt::entity unit : aboard) {
         if (!registry.valid(unit) || !registry.all_of<Components::Garrisoned>(unit)) continue;
         bool landed = false;
+        if (isLand)
+        {
+          rooms.clear();
+          for (const auto radius : radii) rooms.push_back(radius + Navigation::RadiusOf(registry, unit));
+        }
         // Ring by ring out from the hull, so a full load spreads up the beach.
         for (int ring = 0; ring < 4 && !landed; ++ring) {
             Pathfinding::ApproachRequest ask;
@@ -226,17 +254,21 @@ int Disembark(entt::registry& registry, const Physics::Grid& grid, entt::entity 
             ask.clearance = Core::Fixed32(1) / Core::Fixed32(2);
             ask.taken = placed.empty() ? nullptr : placed.data();
             ask.taken_count = placed.size();
+            if (isLand) ask.taken_room = rooms.data();
             ask.layer = Navigation::LayerOf(registry, grid, unit);
+            if (isLand) ask.m_directPathRadius = Navigation::RadiusOf(registry, unit);
             const auto spot = Pathfinding::FindStandingSpot(grid, ask);
             if (!spot.found) continue;
             registry.remove<Components::Garrisoned>(unit);
             registry.emplace<Components::Transform>(unit, Components::Transform{spot.spot, spot.spot});
             placed.push_back(spot.spot);
+            if (isLand) radii.push_back(Navigation::RadiusOf(registry, unit));
             landed = true;
         }
         if (!landed) still.push_back(unit);
     }
     garrison->inside = still;
+    transport_combat::refresh(registry, ship);
     return static_cast<int>(still.size());
 }
 
@@ -266,6 +298,7 @@ void Enter(entt::registry& registry, entt::entity unit, entt::entity building,
     registry.remove<Components::Boarding>(unit);
     registry.remove<Components::Path>(unit);
     registry.remove<Components::Transform>(unit);
+    transport_combat::refresh(registry, building);
     if (auto* selectable = registry.try_get<Components::Selectable>(unit)) {
         selectable->is_selected = false;
     }
@@ -339,17 +372,24 @@ int Capacity(const entt::registry& registry, entt::entity building) {
 
 bool Accepts(const entt::registry& registry, entt::entity building, entt::entity unit) {
     if (!registry.valid(building) || !registry.valid(unit) || building == unit) return false;
-    const bool ship = IsShip(registry, building);
+    const bool ship = isMobileHolder(registry, building);
     const auto* state = registry.try_get<Components::Building>(building);
     if (!ship && (state == nullptr || state->state != Components::BuildingState::Complete)) {
         return false;
     }
-    if (!Combat::Alive(registry, building) || !Combat::Alive(registry, unit)) return false;
+    if (!Combat::Alive(registry, building) || !Combat::Alive(registry, unit) ||
+        !registry.all_of<Components::Transform, Components::Health>(building) ||
+        !registry.all_of<Components::Transform>(unit)) return false;
     if (OwnerOf(registry, building) != OwnerOf(registry, unit)) return false;
     const R::UnitRules* shelter = RulesOf(registry, building);
     const R::UnitRules* guest = RulesOf(registry, unit);
     if (shelter == nullptr || guest == nullptr || shelter->garrison <= 0) return false;
-    if (ship) {
+    if (isLandTransport(registry, building))
+    {
+      const auto* identity = registry.try_get<Components::Identity>(unit);
+      if (identity == nullptr || !Core::trojan_horse::canCarry(identity->unit_id, guest->cls)) return false;
+    }
+    else if (ship) {
         // A transport takes whoever's tasks name its class -- every land unit,
         // in this dat; no garrison type applies to it.
         if (!CanGarrisonIn(*guest, shelter->cls)) return false;
@@ -381,8 +421,8 @@ bool Send(entt::registry& registry, entt::entity unit, entt::entity building) {
 void Eject(entt::registry& registry, const Physics::Grid& grid, entt::entity building, bool fallen) {
     auto* garrison = registry.try_get<Components::Garrison>(building);
     if (garrison == nullptr) return;
-    // A transport has no door: it lands its load at the nearest shore.
-    if (IsShip(registry, building)) {
+    // Mobile holders use their own land or shore unloading route.
+    if (isMobileHolder(registry, building)) {
         if (registry.all_of<Components::Transform>(building)) {
             Unload(registry, grid, building, registry.get<Components::Transform>(building).position);
         }
@@ -429,7 +469,7 @@ int Villagers(const entt::registry& registry, entt::entity building) {
 
 void BackToWork(entt::registry& registry, const Physics::Grid& grid, entt::entity building) {
     auto* garrison = registry.try_get<Components::Garrison>(building);
-    if (garrison == nullptr || IsShip(registry, building)) return;
+    if (garrison == nullptr || isMobileHolder(registry, building)) return;
     // Copied: going back to work can send a unit straight back in.
     const std::vector<entt::entity> inside = garrison->inside;
     garrison->inside.clear();
@@ -452,9 +492,11 @@ void BackToWork(entt::registry& registry, const Physics::Grid& grid, entt::entit
 }
 
 bool IsTransport(const entt::registry& registry, entt::entity holder) {
-    if (!registry.valid(holder) || !IsShip(registry, holder)) return false;
+    if (!registry.valid(holder) || !isMobileHolder(registry, holder)) return false;
     const R::UnitRules* rules = RulesOf(registry, holder);
-    return rules != nullptr && rules->garrison > 0;
+    return rules != nullptr && rules->garrison > 0 &&
+      (rules->cls == 20 || isLandTransport(registry, holder)) &&
+      registry.all_of<Components::Transform, Components::Health>(holder) && Combat::Alive(registry, holder);
 }
 
 void Unload(entt::registry& registry, const Physics::Grid& grid, entt::entity transport,
@@ -462,7 +504,7 @@ void Unload(entt::registry& registry, const Physics::Grid& grid, entt::entity tr
     (void)grid;
     if (!IsTransport(registry, transport) || Count(registry, transport) == 0) return;
     registry.emplace_or_replace<Components::Landing>(transport, Components::Landing{at});
-    registry.remove<Components::Path>(transport);
+    Drop(registry, transport);
 }
 
 bool HasBell(const entt::registry& registry, entt::entity building) {
@@ -663,7 +705,7 @@ void Update(entt::registry& registry, const Physics::Grid& grid, int32_t dt_ms) 
         }
         const auto* route = registry.try_get<Components::Path>(unit);
         if (route != nullptr && route->current_waypoint_index < route->waypoints.size()) continue;
-        if (IsShip(registry, building)) {
+        if (isMobileHolder(registry, building)) {
             // A ship may still be out at sea: the unit walks to the shore
             // beside it once there is one, and meanwhile the ship comes in.
             boarding.wait_ms -= dt_ms;
@@ -671,7 +713,7 @@ void Update(entt::registry& registry, const Physics::Grid& grid, int32_t dt_ms) 
             boarding.wait_ms = kShipRetryMs;
             if (++boarding.attempts > kMaxShipAttempts) {
                 giving_up.push_back(unit);
-            } else if (!RouteTo(registry, grid, unit, building)) {
+            } else if (!RouteTo(registry, grid, unit, building) && !isLandTransport(registry, building)) {
                 CallShip(registry, grid, building, unit);
             }
             continue;
@@ -697,6 +739,41 @@ void Update(entt::registry& registry, const Physics::Grid& grid, int32_t dt_ms) 
         if (Count(registry, ship) == 0) {
             landed.push_back(ship);
             continue;
+        }
+        if (isLandTransport(registry, ship))
+        {
+          const auto at = landings.get<Components::Transform>(ship).position;
+          if (!landing.routed)
+          {
+            landing.routed = true;
+            const auto layer = Navigation::LayerOf(registry, grid, ship);
+            if (!Navigation::CanStand(registry, grid, ship, landing.at) ||
+                Pathfinding::RegionAt(grid, Physics::TileOf(landing.at.x), Physics::TileOf(landing.at.y), layer) !=
+                Navigation::RegionOf(registry, grid, ship))
+            {
+              landed.push_back(ship);
+              continue;
+            }
+            if (Core::FixedMath::Distance(at.x - landing.at.x, at.y - landing.at.y) > Core::Fixed32(1))
+            {
+              auto path = Navigation::Route(registry, grid, ship, at, landing.at);
+              if (path.waypoints.empty())
+              {
+                landed.push_back(ship);
+                continue;
+              }
+              registry.emplace_or_replace<Components::Path>(ship, std::move(path));
+              continue;
+            }
+          }
+          if (Moving(registry, ship)) continue;
+          if (Core::FixedMath::Distance(at.x - landing.at.x, at.y - landing.at.y) > Core::Fixed32(1))
+          {
+            landed.push_back(ship);
+            continue;
+          }
+          if (Disembark(registry, grid, ship) == 0 || ++landing.attempts > kMaxAttempts) landed.push_back(ship);
+          continue;
         }
         if (!landing.routed) {
             landing.routed = true;

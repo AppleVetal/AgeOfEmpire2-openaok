@@ -36,6 +36,8 @@ namespace Core::worldcraft
   bool load(const std::filesystem::path& root, std::string& error);
   bool validateArt(std::string& error);
   const PlantRules& plantRules();
+  int builtUnit(WorldJobKind kind);
+  int builtPopulation(WorldJobKind kind);
   WorkRules workRules(WorldJobKind kind);
   const std::string& jobName(WorldJobKind kind);
   const std::string& heightName(int height);
