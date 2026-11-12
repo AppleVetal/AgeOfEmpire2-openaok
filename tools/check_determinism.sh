@@ -1191,4 +1191,10 @@ if [ "$RIVERS" != "rivers=ok" ] || [ "$RIVERNET" != "rivernet=ok" ]; then
     STATUS=1
 fi
 
+TRANSPORT=$(echo "$OUTPUT" | grep '^transport=')
+if [ "$TRANSPORT" != "transport=ok" ]; then
+    echo "TRANSPORT FAILED: $TRANSPORT" >&2
+    STATUS=1
+fi
+
 exit $STATUS

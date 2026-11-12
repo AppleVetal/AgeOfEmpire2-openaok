@@ -7,7 +7,7 @@
 
 namespace Core::content
 {
-  constexpr uint32_t simulationRevision = 7;
+  constexpr uint32_t simulationRevision = 9;
   // Описывает совместимость симуляции и фактически загруженного пакета данных.
   struct Identity
   {

@@ -1,4 +1,4 @@
-#include "pathfinding/ApproachPlanner.h"
+﻿#include "pathfinding/ApproachPlanner.h"
 
 #include "core/FixedMath.h"
 #include "pathfinding/Pathfinder.h"
@@ -163,6 +163,8 @@ ApproachResult FindStandingSpot(const Physics::Grid& grid,
                 return false;
             }
         }
+        if (request.m_directPathRadius.value > 0 &&
+            !AStar::BodyClear(grid, request.from, spot, request.layer, request.m_directPathRadius)) return false;
         return true;
     };
 

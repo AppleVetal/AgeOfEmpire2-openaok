@@ -1,4 +1,5 @@
-#include "ecs/Missiles.h"
+﻿#include "ecs/Missiles.h"
+#include "ecs/TransportCombat.h"
 
 #include <algorithm>
 #include <vector>
@@ -19,6 +20,7 @@
 #include "ecs/components/Identity.h"
 #include "ecs/components/Owner.h"
 #include "ecs/components/Projectile.h"
+#include "ecs/components/Garrison.h"
 #include "ecs/components/Resource.h"
 #include "ecs/components/Sprite.h"
 #include "ecs/components/Transform.h"
@@ -206,6 +208,16 @@ Volley VolleyOf(const entt::registry& registry, entt::entity shooter) {
     Volley volley;
     const R::UnitRules* rules = Combat::FightingRules(registry, shooter);
     if (rules == nullptr || rules->attack_count == 0) return volley;
+    if (transport_combat::isHorse(registry, shooter))
+    {
+      if (const auto* aboard = registry.try_get<Components::Garrison>(shooter))
+        for (const auto passenger : aboard->inside)
+        {
+          R::UnitRules shot;
+          if (transport_combat::weapon(registry, passenger, shot)) ++volley.own;
+        }
+      return volley;
+    }
     volley.own = rules->projectile >= 0 ? 1 : 0;
     if (!registry.all_of<Components::Building>(shooter)) return volley;
     const int secondary = rules->secondary_projectile >= 0 ? rules->secondary_projectile
@@ -224,6 +236,21 @@ void Fire(entt::registry& registry, const Physics::Grid& grid, entt::entity shoo
     if (!registry.valid(shooter) || !Combat::Alive(registry, target)) return;
     const R::UnitRules* rules = Combat::FightingRules(registry, shooter);
     if (rules == nullptr) return;
+    if (transport_combat::isHorse(registry, shooter))
+    {
+      if (transport_combat::isMoving(registry, shooter) || registry.all_of<Components::Landing>(shooter)) return;
+      const auto* aboard = registry.try_get<Components::Garrison>(shooter);
+      if (aboard == nullptr) return;
+      const auto gap = Combat::Gap(registry, shooter, target);
+      for (const auto passenger : aboard->inside)
+      {
+        R::UnitRules shot;
+        if (!transport_combat::weapon(registry, passenger, shot) || gap > shot.max_range || gap < shot.min_range) continue;
+        const auto* missile = Players::UnitOf(registry, Players::RulesPlayer(registry, passenger), shot.projectile);
+        if (missile != nullptr) LooseOne(registry, shooter, target, shot, shot.projectile, *missile);
+      }
+      return;
+    }
     // Its missiles are those of the table it plays by.
     const Core::PlayerId owner = Players::RulesPlayer(registry, shooter);
     const Volley volley = VolleyOf(registry, shooter);
@@ -265,6 +292,7 @@ void Update(entt::registry& registry, Physics::Grid& grid, int32_t dt_ms) {
             transform.position = flight.to;
             victims.clear();
             Victims(registry, flight, arrow, victims, felled);
+            // Transport shots retain each passenger's launch damage even after unloading.
             // Damage is worked out as it lands: from the shooter's rules now
             // -- a technology finished while it flew counts -- and from the
             // hill the shooter stands on, if it is still alive to stand on
@@ -272,7 +300,8 @@ void Update(entt::registry& registry, Physics::Grid& grid, int32_t dt_ms) {
             // with and loses the hill.
             const bool shooter_alive = Combat::Alive(registry, flight.shooter);
             const R::UnitRules* now =
-                shooter_alive ? Combat::FightingRules(registry, flight.shooter) : nullptr;
+                shooter_alive && !transport_combat::isHorse(registry, flight.shooter)
+                  ? Combat::FightingRules(registry, flight.shooter) : nullptr;
             const R::ClassAmount* attacks = now != nullptr ? now->attacks : flight.attacks;
             const int attack_count = now != nullptr ? now->attack_count : flight.attack_count;
             for (const auto& [victim, stray] : victims) {

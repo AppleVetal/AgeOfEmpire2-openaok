@@ -1,0 +1,34 @@
+{
+  "59010": {
+    "name": "TROJAN_IDLE",
+    "filename": "TH_IDLE",
+    "slp_id": 59010,
+    "frame_count": 1,
+    "angle_count": 8,
+    "layer": 20
+  },
+  "59011": {
+    "name": "TROJAN_WALK",
+    "filename": "TH_WALK",
+    "slp_id": 59011,
+    "frame_count": 4,
+    "angle_count": 8,
+    "layer": 20
+  },
+  "59012": {
+    "name": "TROJAN_DIE",
+    "filename": "TH_DIE",
+    "slp_id": 59012,
+    "frame_count": 1,
+    "angle_count": 8,
+    "layer": 20
+  },
+  "59013": {
+    "name": "TROJAN_CORPSE",
+    "filename": "TH_CORPSE",
+    "slp_id": 59013,
+    "frame_count": 1,
+    "angle_count": 8,
+    "layer": 20
+  }
+}

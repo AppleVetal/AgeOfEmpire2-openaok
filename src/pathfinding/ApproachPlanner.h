@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstddef>
 
 #include "core/FixedPoint.h"
@@ -13,6 +13,7 @@
 // nearest free spot facing it; a crowd sorts itself out locally.
 namespace Pathfinding {
 
+// Задаёт область поиска свободной позиции и ограничения её доступности.
 struct ApproachRequest {
     // The ground being approached, as its owner reports it.
     ECS::Buildings::Bounds target;
@@ -36,6 +37,8 @@ struct ApproachRequest {
     // Whose ground the spot has to be: land for a villager, the sea for a
     // ship come to a dock (physics/Grid's layers).
     Physics::Layer layer = Physics::kLand;
+    // Positive when the body must reach the spot directly from `from`, as when unloading.
+    Core::Fixed32 m_directPathRadius{};
 };
 
 struct ApproachResult {

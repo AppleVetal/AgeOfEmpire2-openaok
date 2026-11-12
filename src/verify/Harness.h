@@ -510,6 +510,7 @@ bool CheckCompatibility();
 
 // Villager-grown walking trees: resources, combat, population and persistence.
 bool CheckTreeman();
+bool CheckTransport();
 
 // A game saved part way through and loaded into a fresh world runs on as the
 // one that never stopped, and a damaged save is refused. Prints "save=".

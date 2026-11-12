@@ -1,4 +1,5 @@
 ﻿#include "save/Save.h"
+#include "ecs/TransportCombat.h"
 
 #include <cstring>
 #include <fstream>
@@ -124,8 +125,8 @@ void Get(Reader& r, C::WorldJob& job) {
         job.workMs < 16 || job.workMs > 12000000 || job.workedMs.value < 0 ||
         job.workedMs > Core::Fixed32(job.workMs) || job.paidWood < 0 || job.paidWood > 40000 ||
         job.paidGold < 0 || job.paidGold > 10000 ||
-        (job.kind != Core::WorldJobKind::GrowTreeman && job.paidGold != 0) ||
-        (job.kind == Core::WorldJobKind::GrowTreeman && job.phase != C::WorldJobPhase::Working) ||
+        (!Core::isUnitConstruction(job.kind) && job.paidGold != 0) ||
+        (Core::isUnitConstruction(job.kind) && job.phase != C::WorldJobPhase::Working) ||
         job.growthLeftMs < 0 || job.growthLeftMs > 3600000 ||
         job.targetElevation < Physics::earthworkMinLevel || job.targetElevation > Physics::earthworkMaxLevel ||
         job.rise < 1 || job.rise > Physics::earthworkMaxLevel || job.clearanceWaitMs < 0 || job.clearanceWaitMs > 1000 ||
@@ -870,6 +871,7 @@ bool Read(ECS::Simulation& sim, const std::vector<uint8_t>& in, std::string* err
         Fail(error, "the saved map is the wrong size");
         return false;
     }
+    ECS::transport_combat::refreshAll(registry);
     sim.ReplaceRegistry(std::move(registry));
     sim.RestoreTick(tick);
     sim.player_starts = std::move(starts);

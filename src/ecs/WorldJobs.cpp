@@ -5,6 +5,7 @@
 #include "core/ConfigManager.h"
 #include "core/Worldcraft.h"
 #include "core/Treeman.h"
+#include "core/TrojanHorse.h"
 #include "ecs/Population.h"
 #include "ecs/Units.h"
 #include "ecs/Buildings.h"
@@ -58,9 +59,9 @@ namespace ECS::world_jobs
       c::Sprite sprite;
       sprite.slp_id = art.slp_id;
       sprite.still = true;
-      sprite.angles = unit == Core::treeman::unitId ? art.angle_count : 1;
-      sprite.frames_per_angle = unit == Core::treeman::unitId ? art.frame_count : 1;
-      sprite.is_file_sprite = unit == Core::treeman::unitId;
+      sprite.angles = (unit == Core::treeman::unitId || unit == Core::trojan_horse::unitId) ? art.angle_count : 1;
+      sprite.frames_per_angle = (unit == Core::treeman::unitId || unit == Core::trojan_horse::unitId) ? art.frame_count : 1;
+      sprite.is_file_sprite = (unit == Core::treeman::unitId || unit == Core::trojan_horse::unitId);
       registry.emplace_or_replace<c::Sprite>(entity, sprite);
       registry.emplace_or_replace<c::Identity>(entity, unit);
     }
@@ -179,7 +180,7 @@ namespace ECS::world_jobs
         registry.emplace<c::Sprite>(site, marker);
         registry.emplace<c::Identity>(site, rules.siteUnit);
       }
-      else showArt(registry, site, command.kind == Core::WorldJobKind::GrowTreeman ? Core::treeman::unitId : rules.siteUnit);
+      else showArt(registry, site, Core::isUnitConstruction(command.kind) ? Core::worldcraft::builtUnit(command.kind) : rules.siteUnit);
       Players::AddStock(*player, Core::ResourceType::Wood, -cost);
       Players::AddStock(*player, Core::ResourceType::Gold, -work.goldCost);
     }
@@ -417,11 +418,11 @@ namespace ECS::world_jobs
         registry.destroy(site);
         continue;
       }
-      if (job.kind == Core::WorldJobKind::GrowTreeman)
+      if (Core::isUnitConstruction(job.kind))
       {
-        if (!Population::HasRoom(registry, player, Core::treeman::settings().population)) continue;
+        if (!Population::HasRoom(registry, player, Core::worldcraft::builtPopulation(job.kind))) continue;
         const c::Vector2D at{Fixed32(job.tileX), Fixed32(job.tileY)};
-        const auto unit = Units::Spawn(registry, Core::treeman::unitId, player, at);
+        const auto unit = Units::Spawn(registry, Core::worldcraft::builtUnit(job.kind), player, at);
         if (unit == entt::null) continue;
         grid.SetWalkable(job.tileX, job.tileY, true);
         Fog::Going(registry, site);

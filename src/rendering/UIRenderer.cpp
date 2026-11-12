@@ -1,4 +1,5 @@
 ﻿#include "UIRenderer.h"
+#include "ecs/TransportCombat.h"
 
 #include "Ground.h"
 #include "EarthworkMarker.h"
@@ -36,6 +37,7 @@
 #include "ecs/components/Worker.h"
 #include "ecs/components/WorldJob.h"
 #include "core/Treeman.h"
+#include "core/TrojanHorse.h"
 #include "core/Worldcraft.h"
 #include "ecs/BuildingGeometry.h"
 #include "ecs/Buildings.h"
@@ -375,13 +377,13 @@ void DrawIcon(SDL_Renderer* sdl_r, uint32_t slp_id, int frame,
 }
 
 // The add-on has native unit frames, so its portrait uses the same atlas as the world.
-void DrawTreemanIcon(SDL_Renderer* renderer, const SDL_Rect& box, int player, uint8_t dim = 255) {
+void drawAddonIcon(SDL_Renderer* renderer, const SDL_Rect& box, int player, uint8_t dim = 255, int graphic = Core::treeman::idleGraphic) {
     auto& graphics = HAL::GraphicCache::Get();
-    const auto* atlas = graphics.GetAtlas(Core::treeman::idleGraphic);
+    const auto* atlas = graphics.GetAtlas(graphic);
     if (atlas == nullptr || atlas->frames.empty()) return;
     const auto& frame = atlas->frames.front().rect;
     if (frame.w <= 0 || frame.h <= 0) return;
-    const auto art = graphics.Art(Core::treeman::idleGraphic, player);
+    const auto art = graphics.Art(graphic, player);
     auto* texture = art.PageOf(frame);
     if (texture == nullptr) return;
     const float scale = std::min(static_cast<float>(box.w) / frame.w, static_cast<float>(box.h) / frame.h);
@@ -1720,6 +1722,16 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
                     ECS::Players::Stock(*player, Core::ResourceType::Wood) >= tree.woodCost &&
                     ECS::Players::Stock(*player, Core::ResourceType::Gold) >= tree.goldCost;
             }
+            if (auto* command = order(13, CommandKind::PlantTree, kIconRepair, -1))
+            {
+              command->jobKind = Core::WorldJobKind::BuildTransport;
+              command->choice = static_cast<int>(Core::PlantShape::Line);
+              const auto* player = ECS::Players::Find(registry, LocalViewer());
+              const auto& horse = Core::trojan_horse::settings();
+              command->affordable = player != nullptr &&
+                ECS::Players::Stock(*player, Core::ResourceType::Wood) >= horse.m_woodCost &&
+                ECS::Players::Stock(*player, Core::ResourceType::Gold) >= horse.m_goldCost;
+            }
         } else if (page == waterworkPage) {
             constexpr int widths[3] = {1, 3, 5};
             for (int i = 0; i < 3; ++i)
@@ -1798,7 +1810,9 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
         order(kSlotUnitDelete, CommandKind::Delete, kIconDelete, 4941);
         garrison();
     } else if (const auto* combat = registry.try_get<ECS::Components::Combat>(selected);
-               combat != nullptr && !registry.all_of<ECS::Components::Building>(selected)) {
+               combat != nullptr && !registry.all_of<ECS::Components::Building>(selected) &&
+               (!ECS::transport_combat::isHorse(registry, selected) ||
+                ECS::transport_combat::fightingRules(registry, selected) != nullptr)) {
         // A trebuchet set up packs again, its Pack where another unit's
         // standing orders go.
         const bool trebuchet = ECS::Packing::Packs(registry, selected);
@@ -1812,6 +1826,12 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
         // the formations are advanced commands; delete and garrison are always
         // there.
         namespace HK = Core::Hotkeys;
+        if (ECS::Garrisons::IsTransport(registry, selected) && ECS::Garrisons::Count(registry, selected) > 0)
+        {
+          auto* command = order(kSlotUnload, CommandKind::Unload, kIconUnload, 4907);
+          if (command != nullptr) command->unit_id = registry.get<ECS::Components::Identity>(selected).unit_id;
+          BindHotkey(command, HK::kUnitCommands, HK::kUnload);
+        }
         if (advanced) {
             if (!trebuchet) {
                 BindHotkey(order(kSlotPatrol, CommandKind::Patrol, kIconPatrol, 4938),
@@ -1894,8 +1914,9 @@ int UIRenderer::BuildCommands(ECS::Simulation& sim, int win_w, int win_h,
         }
         if (ECS::Garrisons::IsTransport(registry, selected) &&
             ECS::Garrisons::Count(registry, selected) > 0) {
-            BindHotkey(order(kSlotUnload, CommandKind::Unload, kIconUnload, 4907),
-                       HK::kUnitCommands, HK::kUnload);
+            auto* command = order(kSlotUnload, CommandKind::Unload, kIconUnload, 4907);
+            if (command != nullptr) command->unit_id = registry.get<ECS::Components::Identity>(selected).unit_id;
+            BindHotkey(command, HK::kUnitCommands, HK::kUnload);
         }
         BindHotkey(order(kSlotStop, CommandKind::Stop, kIconStop, 4905),
                    HK::kUnitCommands, HK::kStop);
@@ -2331,9 +2352,10 @@ void DrawCommandPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int 
         DrawIcon(sdl_r, cmd.icon_slp, cmd.icon_frame, SDL_Rect{x + 2, y + 2, 36, 36},
                  LocalViewer(), cmd.enabled ? 255 : 110);
         Bevel(sdl_r, x, y, 40, 40, pressed);
-        if (cmd.kind == UIRenderer::CommandKind::PlantTree && cmd.jobKind == Core::WorldJobKind::GrowTreeman) {
+        if (cmd.kind == UIRenderer::CommandKind::PlantTree && Core::isUnitConstruction(cmd.jobKind)) {
             Fill(sdl_r, x + 3, y + 3, 34, 34, kBlack);
-            DrawTreemanIcon(sdl_r, SDL_Rect{x + 3, y + 3, 34, 34}, LocalViewer(), cmd.enabled ? 255 : 110);
+            drawAddonIcon(sdl_r, SDL_Rect{x + 3, y + 3, 34, 34}, LocalViewer(), cmd.enabled ? 255 : 110,
+                cmd.jobKind == Core::WorldJobKind::BuildTransport ? Core::trojan_horse::idleGraphic : Core::treeman::idleGraphic);
         } else if (cmd.kind == UIRenderer::CommandKind::PlantTree || cmd.kind == UIRenderer::CommandKind::Earthwork ||
             cmd.kind == UIRenderer::CommandKind::EarthworkHeight || cmd.kind == UIRenderer::CommandKind::WaterWidth ||
             (cmd.kind == UIRenderer::CommandKind::SwitchPage &&
@@ -2440,6 +2462,7 @@ void DrawUnitPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int win
     // difference from the dat's own unit.
     const auto* rules = owner != Core::PLAYER_GAIA
         ? ECS::Players::UnitOf(registry, owner, slot_id) : nullptr;
+    if (const auto* battery = ECS::transport_combat::fightingRules(registry, selected)) rules = battery;
     const auto& base_units = Core::Rules::Get().units;
     const Core::Rules::UnitRules* base =
         unit_id >= 0 && unit_id < static_cast<int>(base_units.size()) ? &base_units[unit_id]
@@ -2457,8 +2480,8 @@ void DrawUnitPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int win
         const int progress = worldJob->phase == ECS::Components::WorldJobPhase::Working
             ? (worldJob->workedMs * Core::Fixed32(100) / Core::Fixed32(worldJob->workMs)).ToInt()
             : 100 - worldJob->growthLeftMs * 100 / Core::worldcraft::plantRules().growthMs;
-        const std::string label = worldJob->kind == Core::WorldJobKind::GrowTreeman && progress == 100
-            ? Core::treeman::settings().populationWait : std::to_string(progress) + "%";
+        const std::string label = Core::isUnitConstruction(worldJob->kind) && progress == 100
+            ? (worldJob->kind == Core::WorldJobKind::BuildTransport ? Core::trojan_horse::settings().m_populationWait : Core::treeman::settings().populationWait) : std::to_string(progress) + "%";
         Text::Draw(sdl_r, Text::kArial8, layout.stat_text.x, layout.stat_text.y, label, kBlack);
     }
 
@@ -2471,8 +2494,10 @@ void DrawUnitPanel(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, int win
     if (worldJob != nullptr && Core::isEarthwork(worldJob->kind))
         earthwork_marker::draw(sdl_r, worldJob->kind, static_cast<float>(layout.portrait.x + 18),
             static_cast<float>(layout.portrait.y + 22), 0.5f);
+    else if (unit_id == Core::trojan_horse::unitId)
+        drawAddonIcon(sdl_r, SDL_Rect{layout.portrait.x, layout.portrait.y, 36, 36}, owner, 255, Core::trojan_horse::idleGraphic);
     else if (unit_id == Core::treeman::unitId || unit_id == Core::treeman::wildUnitId)
-        DrawTreemanIcon(sdl_r, SDL_Rect{layout.portrait.x, layout.portrait.y, 36, 36}, owner);
+        drawAddonIcon(sdl_r, SDL_Rect{layout.portrait.x, layout.portrait.y, 36, 36}, owner);
     else DrawIcon(sdl_r, IconSheetFor(unit_id), ui->icon,
              SDL_Rect{layout.portrait.x, layout.portrait.y, 36, 36},
              owner != Core::PLAYER_GAIA ? owner : LocalViewer(), 255);
@@ -2628,8 +2653,10 @@ void DrawSelectionCards(SDL_Renderer* sdl_r, ECS::Simulation& sim, int win_w, in
         // The icon at its own size, its hit points over its bottom two rows.
         Fill(sdl_r, r.x + 2, r.y + 2, r.w - 4, r.h - 4, kBlack);
         if (ui) {
-            if (unit_id == Core::treeman::unitId || unit_id == Core::treeman::wildUnitId)
-                DrawTreemanIcon(sdl_r, SDL_Rect{r.x + 2, r.y + 2, r.w - 4, r.h - 4}, owner);
+            if (unit_id == Core::trojan_horse::unitId)
+                drawAddonIcon(sdl_r, SDL_Rect{r.x + 2, r.y + 2, r.w - 4, r.h - 4}, owner, 255, Core::trojan_horse::idleGraphic);
+            else if (unit_id == Core::treeman::unitId || unit_id == Core::treeman::wildUnitId)
+                drawAddonIcon(sdl_r, SDL_Rect{r.x + 2, r.y + 2, r.w - 4, r.h - 4}, owner);
             else DrawIcon(sdl_r, IconSheetFor(unit_id), ui->icon,
                      SDL_Rect{r.x + 2, r.y + 2, r.w - 4, r.h - 4}, owner, 255);
         }
@@ -2667,6 +2694,8 @@ std::string UIRenderer::CommandHelp(ECS::Simulation& sim, const Command& command
             (Core::isWaterwork(command.jobKind) && command.choice == static_cast<int>(Core::PlantShape::Line) ?
                 Core::worldcraft::text("water_width") + ": " + std::to_string(command.m_width) + ". " : "") +
             Core::worldcraft::earthworkHelp(command.jobKind);
+    if (command.kind == CommandKind::PlantTree && command.jobKind == Core::WorldJobKind::BuildTransport)
+        return Core::trojan_horse::settings().m_build + ". " + Core::trojan_horse::settings().m_help;
     if (command.kind == CommandKind::PlantTree && command.jobKind == Core::WorldJobKind::GrowTreeman)
         return Core::treeman::settings().grow + ". " + Core::treeman::settings().help;
     if (command.kind == CommandKind::PlantTree)
@@ -2702,6 +2731,8 @@ std::string UIRenderer::CommandHelp(ECS::Simulation& sim, const Command& command
         text = at == std::string::npos
             ? help
             : help.substr(0, at) + std::to_string(command.label) + help.substr(at + 2);
+    } else if (command.kind == CommandKind::Unload && command.unit_id == Core::trojan_horse::unitId) {
+        text = Core::trojan_horse::settings().m_unloadHelp;
     } else if (command.name_string >= 0) {
         text = Core::Strings::Get(command.name_string);
     }
@@ -2770,7 +2801,7 @@ void UIRenderer::DrawHelpText(ECS::Simulation& sim, SDL_Renderer* sdl_r, int win
         const auto kind = Core::InputManager::Get().workKind();
         if (Core::isWaterwork(kind))
             text = Core::worldcraft::text("water_width") + ": " + std::to_string(Core::InputManager::Get().workWidth()) + ". " + text;
-        if (Core::isEarthwork(kind) || kind == Core::WorldJobKind::GrowTreeman)
+        if (Core::isEarthwork(kind) || Core::isUnitConstruction(kind))
             text = Core::worldcraft::jobName(kind) + ". " + text;
         if (kind == Core::WorldJobKind::RaiseGround)
             text = Core::worldcraft::heightName(Core::InputManager::Get().workHeight()) + ". " + text;

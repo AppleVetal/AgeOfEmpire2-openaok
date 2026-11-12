@@ -33,6 +33,8 @@
 #include "core/Hotkeys.h"
 #include "core/Strings.h"
 #include "core/Treeman.h"
+#include "core/TrojanHorse.h"
+#include "ecs/TransportCombat.h"
 #include "ecs/Garrisons.h"
 #include "ecs/Relics.h"
 #include "ecs/Trade.h"
@@ -96,6 +98,13 @@ bool Shoots(const entt::registry& registry, entt::entity building) {
 // target is too far away to attack.") or within its least range, or 0.
 constexpr int kTooFar = 3068;
 constexpr int kTooClose = 3067;
+bool isArmed(const entt::registry& registry, entt::entity entity)
+{
+  return registry.all_of<ECS::Components::Combat>(entity) &&
+    (!ECS::transport_combat::isHorse(registry, entity) ||
+      ECS::transport_combat::fightingRules(registry, entity) != nullptr);
+}
+
 int OutOfReach(const entt::registry& registry, entt::entity attacker, entt::entity target) {
     const auto* rules = ECS::Combat::FightingRules(registry, attacker);
     if (rules == nullptr) return 0;
@@ -201,7 +210,7 @@ void InputManager::GivePendingOrder(ECS::Simulation& sim, float x, float y) {
         if (!picked.get<ECS::Components::Selectable>(e).is_selected) continue;
         if (picked.get<ECS::Components::Owner>(e).player_id != Core::LocalPlayer()) continue;
         if (registry.all_of<ECS::Components::Building>(e)) continue;
-        if (fighters_only && !registry.all_of<ECS::Components::Combat>(e)) continue;
+        if (fighters_only && !isArmed(registry, e)) continue;
         if (order == PendingOrder::Repair && !registry.all_of<ECS::Components::Worker>(e)) continue;
         units.push_back(e);
     }
@@ -809,7 +818,7 @@ void InputManager::UpdateIntent(ECS::Simulation& sim, Rendering::Renderer& rende
         if (const auto* monk = registry.try_get<ECS::Components::Monk>(e)) {
             monks = true;
             faithful = faithful || monk->faith >= Fixed32(100);
-        } else if (registry.all_of<ECS::Components::Combat>(e) || ECS::Packing::Packed(registry, e)) {
+        } else if (isArmed(registry, e) || ECS::Packing::Packed(registry, e)) {
             fighters = true;
         }
     }
@@ -903,7 +912,7 @@ void InputManager::UpdateIntent(ECS::Simulation& sim, Rendering::Renderer& rende
     // -- but not a transport the selection can board.
     if (villagers && site == nullptr && wounded &&
         (ship || one_of({kSiegeClass, kPackedClass, kUnpackedSiegeClass, kSiegeShipClass}))) {
-        const bool boards = cls == kTransportClass && mine &&
+        const bool boards = ECS::Garrisons::IsTransport(registry, nearest) && mine &&
                             any([&](entt::entity e) { return ECS::Garrisons::Accepts(registry, nearest, e); });
         if (!boards) {
             intent = Intent::Work;
@@ -1007,10 +1016,12 @@ void InputManager::UpdateIntent(ECS::Simulation& sim, Rendering::Renderer& rende
     // boards; a wounded unit for a monk to heal -- not the one monk
     // selected hovering itself.
     if (friendly && site == nullptr && health != nullptr) {
-        if (mine && cls == kTransportClass &&
+        if (mine && ECS::Garrisons::IsTransport(registry, nearest) &&
             any([&](entt::entity e) { return ECS::Garrisons::Accepts(registry, nearest, e); })) {
             intent = Intent::Board;
-            Rendering::UIRenderer::SetWorldHint(3906);
+            if (identity != nullptr && identity->unit_id == trojan_horse::unitId)
+              Rendering::UIRenderer::setWorldUnitHint(trojan_horse::unitId);
+            else Rendering::UIRenderer::SetWorldHint(3906);
         } else if (monks && wounded && !ship &&
                    !one_of({kSiegeClass, kPackedClass, kUnpackedSiegeClass, kSiegeShipClass}) &&
                    any([&](entt::entity e) { return e != nearest && registry.all_of<ECS::Components::Monk>(e); })) {
@@ -2119,7 +2130,7 @@ void InputManager::ProcessEvent(const SDL_Event& event, ECS::Simulation& sim, Re
                            (registry.any_of<ECS::Components::Combat, ECS::Components::Monk>(e) ||
                             ECS::Packing::Packed(registry, e)) &&
                            e != target_enemy) {
-                    if (const int why = registry.all_of<ECS::Components::Combat>(e)
+                    if (const int why = isArmed(registry, e)
                                             ? OutOfReach(registry, e, target_enemy) : 0;
                         why != 0) {
                         refusal = why;

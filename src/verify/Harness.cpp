@@ -27,6 +27,7 @@ int Run(int ticks) {
     if (runs("rivers")) ok &= CheckRivers();
     if (runs("rivernet")) ok &= CheckRiversNetwork();
     if (runs("treeman")) ok &= CheckTreeman();
+    if (runs("transport")) ok &= CheckTransport();
     if (runs("worldjobs")) ok &= CheckWorldJobs();
     if (runs("earthworks")) ok &= CheckEarthworks();
     if (runs("earthnet")) ok &= CheckEarthworksNetwork();
