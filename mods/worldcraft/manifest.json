@@ -4,5 +4,5 @@
   "schema": 1,
   "rules": "rules.json",
   "graphics": "graphics.json",
-  "strings": "strings.ru.json"
+  "strings": "strings.en.json"
 }

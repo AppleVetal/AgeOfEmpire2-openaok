@@ -1,44 +1,50 @@
-Троянский конь — наземный транспорт
+[Russian version](README_ru.txt)
 
-Строительство: выбрать жителя, третья кнопка третьего ряда команд,
-указать свободную сухопутную клетку. Перетаскивание задаёт линию нескольких
-повозок; Shift добавляет работу в очередь. Несколько жителей работают вместе.
-Цена одной повозки: 250 дерева и 100 золота; 60 секунд работы одного жителя.
-По завершении нужны 2 свободных места населения. Отмена возвращает
-неизрасходованную долю ресурсов по общим правилам строительных работ.
+Trojan Horse — land transport
 
-400 здоровья, скорость 1,6 клетки/с, 12 мест. Без стрелков не атакует.
-Лечения пассажиров нет.
-Внутрь входят свои жители, пехота, стрелки и прочие пешие бойцы.
-Конница, осадные машины, древни, монахи, животные и другие повозки не входят.
-Пассажиры продолжают занимать население. При уничтожении повозки все погибают.
+Construction: select a villager, press the third button in the third command
+row, and choose a free land tile. Drag to place a line of wagons; Shift
+adds work to the queue. Several villagers can work together.
+Cost per wagon: 250 wood and 100 gold; 60 seconds of work for one villager.
+Completion requires 2 free population slots. Cancellation refunds unused
+resources according to the shared construction rules.
 
-Посадка: выбрать пассажиров, правая кнопка по своей повозке.
-Высадка: выбрать повозку, нажать «Высадить», затем указать место на суше.
-Повозка доезжает туда и выпускает пассажиров на свободную землю рядом.
-Если свободного выхода нет, пассажиры остаются внутри; освободите место
-и повторите высадку. Реки и водяные рвы обходятся по сухопутным маршрутам.
-Ремонт повреждённой повозки: явная команда ремонта жителю.
+400 hit points, speed 1.6 tiles/s, 12 seats. Cannot attack without shooters.
+Passengers are not healed.
+Your villagers, infantry, archers, and other foot soldiers can board.
+Cavalry, siege engines, treants, monks, animals, and other wagons cannot.
+Passengers continue to use population. All die if the wagon is destroyed.
 
-Стрельба: лучники, арбалетчики и застрельщики используют свои снаряды,
-урон и дальность с учётом улучшений. Копейщики и пикинёры метают копья
-на 4 клетки: обычный урон оружия становится колющим, бонусы против конницы,
-слонов и других классов не переносятся. После высадки бойцы сохраняют
-обычное вооружение. Жители и мечники не добавляют снарядов к залпу.
-Общая перезарядка равна самой долгой перезарядке стрелков внутри.
-Каждый подходящий пассажир выпускает один снаряд, если цель в его дальности.
-Стрельба идёт только с остановки, автоматически или по приказу атаковать.
-Начальная стойка — удерживать позицию; по приказу атаковать конь сам
-подъезжает на дальность огня. При высадке атака прекращается.
-Уже выпущенные снаряды сохраняют урон после высадки или гибели стрелка.
+Boarding: select passengers and right-click your wagon.
+Unloading: select the wagon, press "Unload", then choose a location on land.
+The wagon travels there and releases passengers onto nearby free ground.
+If no free exit is available, passengers stay inside; clear space and repeat
+the unload order. Rivers and water moats are avoided using land routes.
+Repairing a damaged wagon requires an explicit repair order to a villager.
 
-Параметры: unit.json. Native SLP/DRS: trojan-horse.drs, graphics.json,
-animations.json. Графика создана встроенным ImageGen: 5 направлений с
-зеркальным отражением до 8, покой, 4 кадра движения, обломки.
-Переход к обломкам мгновенный; отдельной анимации падения нет.
-Исходный атлас, точный запрос и преобразователи сохранены в соседней
-рабочей папке outputs/trojan-horse-unit. Оригинальные ресурсы AoK не включены.
+Shooting: archers, crossbowmen, and skirmishers use their own projectiles,
+damage, and range, including upgrades. Spearmen and pikemen throw spears
+up to 4 tiles: normal weapon damage becomes pierce damage; bonuses against
+cavalry, elephants, and other classes are not carried over. After unloading,
+fighters retain their normal weapons. Villagers and swordsmen add no shots
+to the volley.
+The shared reload time is the longest reload time among the shooters inside.
+Each eligible passenger fires one projectile if the target is within range.
+Fire is possible only while stationary, automatically or on an attack order.
+The initial stance is stand ground; an attack order makes the horse move
+into firing range. Unloading stops the attack.
+Projectiles already fired retain their damage after the shooter unloads or dies.
 
-Для сети у всех участников должна быть эта же сборка с одинаковыми файлами
-модификации. Ревизия симуляции 9; сохранения и повторы 0.4.0 (ревизия 7)
-не загружаются в эту ветку. Установщик 0.4.0 не содержит транспорт.
+Parameters: unit.json. English and Russian labels: ../strings.en.json and
+../strings.ru.json. The installer saves the choice; otherwise English is used.
+Use --worldcraft-language ru to override it for one launch.
+Native SLP/DRS: trojan-horse.drs, graphics.json, animations.json.
+Artwork was created with the built-in ImageGen: 5 directions mirrored to 8,
+idle, 4 movement frames, and wreckage.
+The transition to wreckage is immediate; there is no separate falling animation.
+The source atlas, exact prompt, and converters are kept in the neighboring
+outputs/trojan-horse-unit working folder. Original AoK assets are not included.
+
+For network play, everyone must use the same build and identical mod files.
+Simulation revision 9; saves and replays from 0.4.0 (revision 7)
+cannot be loaded in this branch. The 0.4.0 installer does not contain the transport.

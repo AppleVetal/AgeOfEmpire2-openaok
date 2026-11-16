@@ -1,160 +1,181 @@
-Worldcraft 0.4.0 — лес, горы, древни, реки с течением и водяные рвы силами жителей
+[Russian version](README_ru.txt)
 
-Управление
-  Выберите одного или нескольких жителей. Во втором ряду панели:
-  три дерева в ряд — линия; квадрат деревьев — прямоугольная область;
-  крестик справа — отмена незавершённых работ в очередях выбранных жителей.
-  Зажмите левую кнопку на карте, протяните и отпустите.
-  Один щелчок размещает одно дерево. Предварительный вид показывает клетки;
-  красным отмечаются клетки, для которых не выполнены условия посадки.
-  Shift добавляет работу к очереди и оставляет режим размещения включённым.
-  Esc выходит из режима размещения, не отменяя уже выданные задания.
-  Повторное размещение на своём незавершённом участке добавляет работников.
-  Выбранный незавершённый участок или растущее дерево можно удалить через Delete.
-  Полностью выросшее дерево становится общим ресурсом и рубится обычным приказом.
+Worldcraft 0.4.0 — villagers create forests, mountains, treants, flowing rivers, and water moats
 
-Правила
-  rules.json: стоимость в дереве, время работы одного жителя и время роста.
-  Начальные значения: 10 дерева, 10000 мс работы, 60000 мс роста.
-  Каждый дополнительный работник добавляет треть скорости одного жителя.
-  Область обрабатывается от середины к краям, линия — от начала к концу.
-  До 256 клеток в одном приказе, 256 незавершённых/растущих участков игрока,
-  до 256 участков в очереди одного жителя.
-  Занятые, невидимые и неподходящие клетки пропускаются. Если дерева не хватает,
-  оплачивается только доступное число посадок. При повторной работе на том же
-  участке стоимость не списывается ещё раз. Оплата выполняется при выдаче приказа.
-  Будущие участки резервируются для строительства, но остаются проходимыми.
-  Начавшийся участок и растущее дерево блокируют клетку. Находящиеся на ней юниты
-  задерживают начало работ; они не перемещаются и не уничтожаются посадкой.
-  При отмене возвращается целая неиспользованная доля оплаты; за уже выполненную
-  работу и завершённую посадку возврата нет. Если работников не осталось,
-  незавершённая работа отменяется. Растущие деревья работников не требуют.
-  Обычный новый приказ, Stop или бой снимает жителя с его очереди посадок.
-  Участок, к которому житель не может подойти после ограниченного числа попыток,
-  пропускается; очередь продолжается. Если его больше никто не выполняет, оплата
-  возвращается по тем же правилам.
+Controls
+  Select one or more villagers. In the second panel row:
+  three trees in a row — line; a square of trees — rectangular area;
+  the cross on the right — cancel unfinished work in selected villagers' queues.
+  Hold the left mouse button on the map, drag, and release.
+  A single click places one tree. The preview shows tiles;
+  red marks tiles that do not meet planting conditions.
+  Shift queues the work and keeps placement mode active.
+  Esc exits placement mode without canceling existing orders.
+  Placing an order again on your own unfinished site adds workers.
+  A selected unfinished site or growing tree can be removed with Delete.
+  A fully grown tree becomes a shared resource and is chopped with an ordinary order.
 
-Ходячее дерево
-  Выберите жителя и первую кнопку третьего ряда — «Вырастить древня».
-  Щелчок задаёт один участок; протягивание мыши — ряд. Shift добавляет задания.
-  Начальные параметры: 600 здоровья, 30 урона ближнего боя, броня 2/4,
-  скорость 0,6 клетки/с, обзор 6. На юнита требуются 200 древесины, 50 золота,
-  60 секунд труда одного жителя и 3 места населения. Несколько жителей
-  ускоряют выращивание по общим правилам совместной работы.
-  При нехватке населения завершённое выращивание ждёт постройки дома.
-  Пока житель работает, участок занят; готовый древень освобождает клетку
-  и получает обычные команды движения, атаки, остановки и строя.
-  Древень не является запасом древесины. Отмена до завершения возвращает
-  неиспользованную долю дерева и золота. Общие боевые улучшения пехоты действуют
-  на древня; цена выращивания задаётся отдельно в параметрах дополнения.
-  На новой случайной карте размещаются 10 мирных диких древней, на суше
-  вдали от стартовых баз. Они неспешно бродят и не дают ресурсов при добыче.
-  Подведите своего жителя или бойца на расстояние 3 клеток: ближайший юнит
-  приручит древня бесплатно. При равном расстоянии используется постоянный
-  порядок юнитов, одинаковый у всех сетевых участников.
-  После приручения это обычный боец; чужие юниты больше не переманивают его
-  приближением. Он занимает 3 места населения, даже при превышении лимита.
-  Число и расстояния задаются wild_count, wild_start_distance и tame_radius
-  в treeman/unit.json. Древни не добавляются в готовые сценарии.
-  Правила и тексты — treeman/unit.json; графика — отдельный walking-tree.drs.
-  Для сетевой игры у участников должны совпадать сборка и весь пакет Worldcraft.
-  Эта ветка использует ревизию симуляции 6 и формат сохранений 16;
-  сохранения и повторы предыдущей ревизии несовместимы.
+Rules
+  rules.json: wood costs, work time for one villager, and growth time.
+  Initial values: 10 wood, 10000 ms of work, 60000 ms of growth.
+  Each additional worker adds one third of a single villager's speed.
+  Areas are processed from the center outward; lines from start to end.
+  Up to 256 tiles per order, 256 unfinished/growing sites per player,
+  and 256 sites in one villager's queue.
+  Occupied, invisible, and unsuitable tiles are skipped. If wood is insufficient,
+  only as many plantings as can be afforded are paid for. Working again on the
+  same site does not charge again. Payment occurs when the order is issued.
+  Future sites are reserved against construction but remain traversable.
+  Active planting sites and growing trees block their tile. Units on the tile
+  delay the start; planting does not move or destroy them.
+  Cancellation returns the whole unused fraction of the cost; completed work
+  and finished planting are not refunded. If no workers remain, unfinished
+  work is canceled. Growing trees do not require workers.
+  A normal new order, Stop, or combat removes a villager from its planting queue.
+  A site the villager cannot reach after a bounded number of attempts is skipped;
+  the queue continues. If nobody else is working there, payment is refunded
+  under the same rules.
 
-Горы, рвы, канавы, озёра и восстановление земли
-  Во втором ряду четвёртая кнопка открывает панель земляных работ.
-  Первые три кнопки выбирают высоту: холм (4), гора (12), высокая гора (18).
-  По умолчанию выбрана гора, сравнимая по высоте с башней или замком.
-  Далее идут пары «линия/область»: гора, ров, восстановление, канава, озеро.
-  Две последние кнопки — отмена незавершённых работ и возврат к обычной панели.
-  У каждой выбранной клетки горы автоматически формируются склоны шириной
-  до шести клеток; они включены в стоимость. Область образует общую вершину.
-  Предельная высота — 24. Для увеличения высоты можно повторить приказ.
-  Перепад до одного уровня проходим, более крутые поднятые клетки — преграда.
-  Сухой ров опускает землю на два уровня, до минимальной высоты -4, и закрывает
-  проход. Мелкая канава глубиной один уровень остаётся проходимой. Озеро создаёт
-  воду на высоте -2 с водной проходимостью. Восстановление возвращает исходные
-  высоту и покрытие клетки, в том числе исходную воду.
-  Стоимость и время на уровень одной клетки: гора — 10 древесины и 15 секунд,
-  ров, озеро и восстановление — 5 древесины и 10 секунд; канава — 3 древесины
-  и 5 секунд. Для горы оплачивается подъём выбранной клетки, включая её склоны.
-  Настройки — в rules.json.
-  Правила очереди, совместной работы, оплаты и отмены общие с посадкой леса.
-  Изменяемая поверхность должна быть разведана. Работники подходят снаружи
-  рабочего участка. Перед завершением существа, деревья и прочие ресурсы
-  смещаются на свободные подходящие клетки за пределами запланированных работ.
-  Сохраняются сущности, здоровье, принадлежность и остаток ресурсов.
-  Если для кого-либо нет места в пределах 32 клеток, работа ожидает; частичного
-  переноса нет. Вода под горой или сухой выемкой заменяется песком.
-  Здания и их основания не перемещаются и не меняются. Гору можно построить
-  вплотную; клетки под зданием исключаются из склонов. Новый фундамент или
-  посадка не могут занять уже зарезервированный рабочий участок.
-  Недоступные клетки пропускаются. Незавершённые земляные работы не блокируют
-  проход. В отличие от дерева, отдельного периода роста у них нет.
-  Холмик или ямка обозначают место работы; готовая гора или ров меняет сам
-  рельеф карты. Отмена не удаляет уже готовые горы: используйте восстановление.
-  Скрытые изменения высоты и покрытия видны только после разведки участка.
+Walking Tree
+  Select a villager and the first button in the third row — "Grow a treant".
+  A click sets one site; dragging places a row. Shift queues tasks.
+  Initial parameters: 600 hit points, 30 melee damage, armor 2/4,
+  speed 0.6 tiles/s, line of sight 6. Each unit requires 200 wood, 50 gold,
+  60 seconds of work for one villager, and 3 population slots. Multiple villagers
+  speed up growing under the shared-work rules.
+  If population space is insufficient, completed growing waits for a house.
+  The site is occupied while the villager works; the completed treant frees
+  the tile and receives normal movement, attack, stop, and formation commands.
+  A treant is not a wood resource. Canceling before completion refunds the unused
+  fraction of wood and gold. Common infantry combat upgrades apply to it;
+  growing costs are defined separately in the mod settings.
+  Each new random map places 10 peaceful wild treants on land away from starting bases.
+  They wander slowly and provide no resources when gathered.
+  Bring your villager or fighter within 3 tiles: the nearest unit tames
+  the treant for free. Equal distances use a stable unit order that is the same
+  for every network participant.
+  Once tamed, it is a normal fighter; enemy units cannot claim it by approaching.
+  It uses 3 population slots even above the limit.
+  Count and distances are set by wild_count, wild_start_distance, and tame_radius
+  in treeman/unit.json. Treants are not added to existing scenarios.
+  Rules are in treeman/unit.json; artwork is in a separate walking-tree.drs.
+  Text is in strings.en.json and strings.ru.json.
+  For multiplayer, participants need matching builds and the full Worldcraft package.
+  This branch uses simulation revision 6 and save format 16;
+  saves and replays from the previous revision are incompatible.
 
-Данные
-  manifest.json — идентификатор, версия, схема и имена файлов пакета.
-  graphics.json — ссылки на имеющиеся спрайты оригинальной игры:
-  пень для участка посадки дерева, отдельное дерево при росте, дуб после роста.
-  Земляные работы изображаются собственными холмиками и ямками движка.
-  Новые внешние SLP-файлы этот пакет пока не загружает.
-  strings.ru.json — новые русские надписи и подсказки.
-  Извлечённые файлы оригинала не изменяются. Пакет содержит только собственные
-  настройки и ссылки на данные установленной пользователем игры.
-  После изменения настроек перезапустите игру. В сетевом матче у всех должны
-  совпадать движок и все четыре файла пакета. Они входят в проверку совместимости.
+Mountains, dry moats, ditches, lakes, and terrain restoration
+  The fourth button in the second row opens the earthworks panel.
+  The first three buttons choose height: hill (4), mountain (12), tall mountain (18).
+  Mountain is selected by default, roughly as tall as a tower or castle.
+  Next are line/area pairs: mountain, dry moat, restoration, ditch, lake.
+  The last two buttons cancel unfinished work and return to the normal panel.
+  Each selected mountain tile automatically gets slopes up to six tiles wide;
+  they are included in the cost. An area creates a shared summit.
+  Maximum height is 24. Repeat the order to increase height.
+  A difference of up to one level is traversable; steeper raised tiles block movement.
+  A dry moat lowers the ground by two levels, down to a minimum of -4, and blocks
+  passage. A shallow one-level ditch remains traversable. A lake creates
+  water at elevation -2 with water passability. Restoration returns the tile's
+  original elevation and terrain type, including original water.
+  Cost and time per tile level: mountain — 10 wood and 15 seconds;
+  dry moat, lake, and restoration — 5 wood and 10 seconds; ditch — 3 wood
+  and 5 seconds. For a mountain, raising the selected tile pays for its slopes too.
+  Settings are in rules.json.
+  Queueing, shared work, payment, and cancellation follow the forest-planting rules.
+  The surface to be changed must be explored. Workers approach from outside
+  the site. Before completion, creatures, trees, and other resources move
+  to suitable free tiles outside the planned work.
+  Entities, health, ownership, and remaining resources are preserved.
+  If any object has no space within 32 tiles, work waits; there is no partial
+  relocation. Water under a mountain or dry excavation is replaced by sand.
+  Buildings and their foundations do not move or change. A mountain can be built
+  right next to them; tiles under buildings are excluded from slopes. A new
+  foundation or planting cannot occupy an already reserved work site.
+  Inaccessible tiles are skipped. Unfinished earthworks do not block passage.
+  Unlike trees, earthworks have no separate growth period.
+  A mound or pit marks the work site; the finished mountain or moat changes
+  the map's actual terrain. Canceling does not remove completed mountains:
+  use restoration. Hidden elevation and terrain changes appear only after exploration.
 
-Реки и водяные рвы
-  Вторая кнопка третьего ряда у жителя открывает водные работы.
-  Верхний ряд задаёт ширину линии: 1, 3 или 5 клеток (по умолчанию 3).
-  Второй ряд: река линией, река областью, водяной ров линией, ров областью.
-  Нижний ряд: восстановление линией, восстановление областью, отмена и назад.
-  Линия расширяется по обе стороны с квадратными концами. Диагональные
-  клетки соединяются сторонами. Область имеет размер протянутого прямоугольника,
-  выбранная ширина на неё не влияет. Ограничение 256 включает всю ширину;
-  превышающий его приказ отклоняется целиком.
-  Жители работают от середины русла к берегам. Готовая клетка сразу получает
-  воду на уровне -2; источника воды не требуется. Отсчёт направления течения —
-  от начала протягивания к концу. У отдельной клетки течение направлено
-  по положительной оси X карты. Течение только отображается и не меняет
-  скорость корабля. У водяного рва течение отсутствует.
-  Начальная цена за уровень изменения высоты: 5 древесины и 10 секунд труда.
-  На равнине клетка глубиной два уровня стоит 10 древесины и 20 секунд труда.
-  Реки закрыты для сухопутных юнитов; корабли проходят при достаточной ширине
-  русла и свободных берегах. Ров закрыт также для кораблей.
-  Препятствия смещаются по общим правилам земляных работ, здания сохраняются;
-  их клетки пропускаются, поэтому около здания русло может иметь разрыв.
-  Восстановление возвращает исходные высоту и покрытие, убирает течение.
-  Для засыпки широкого водоёма начинайте с доступного берега; недоступные
-  участки обрабатываются по общим правилам очереди.
-  Сохранения, повторы и сетевая игра переносят ширину приказа и направление
-  течения. Изменения за туманом войны остаются скрыты до повторной разведки.
+Data
+  manifest.json — package identifier, version, schema, and filenames.
+  graphics.json — references to existing original-game sprites:
+  a stump for a tree planting site, a separate tree during growth, and an oak afterward.
+  Earthworks use the engine's own mounds and pits.
+  This package does not yet load new external SLP files.
+  strings.en.json and strings.ru.json — English and Russian names, commands,
+  tooltips, and notifications for all Worldcraft additions.
+  Original extracted files are not modified. The package contains its own
+  settings and references to data from the user's installed game.
+  Restart the game after changing settings. Network participants must have
+  matching engines and package files, including both language dictionaries.
+  Both dictionaries enter compatibility checks regardless of the selected language.
 
-Форматы
-  Ревизия симуляции 10, сетевой протокол 9, сохранения 18, повторы AOKCREC7.
-  Сохранения и повторы предыдущей сборки не переносятся автоматически.
+Interface language
+  The installer saves your choice; otherwise English is the default.
+  To override it for one launch, run from the build directory:
+    OpenAoK.exe --worldcraft-language en
+    OpenAoK.exe --worldcraft-language ru
+  The option affects only Worldcraft additions: planting, earthworks, rivers,
+  treants, the Trojan Horse, and Gorynych. Original-game text keeps the language
+  of the user's game data. Missing or unsupported language arguments are errors.
+  Changing this option does not change game rules or the content fingerprint.
+  Updating the localization package itself changes that fingerprint; older
+  saves, replays, or clients with different package files remain incompatible.
 
-Змей Горыныч
-  На новой случайной карте появляются 10 мирных нейтральных Горынычей.
-  Подведите жителя или бойца на 3 клетки: Горыныч навсегда присоединится
-  к игроку и займёт 5 мест населения. Повторно переманить его приближением нельзя.
-  Житель выращивает Горыныча кнопкой дракона в нижнем ряду команд:
-  400 дерева, 300 золота, 120 секунд труда, 5 свободных мест населения.
-  Щелчок задаёт одного Горыныча, протягивание — ряд, Shift добавляет очередь.
-  При нехватке населения выращивание ждёт свободного жилья.
-  Горыныч имеет 900 здоровья, скорость 1,6 клетки/с и дальность огня 5 клеток.
-  Он летает над водой, деревьями, горами и зданиями. Три головы стреляют
-  по одной цели только при зависании: по 12 колющего урона до брони за голову,
-  перезарядка 3 секунды, поражение врагов рядом в радиусе 0,6 клетки.
-  Обычный ближний бой не достаёт Горыныча, дальнобойные атаки поражают его.
-  Корабли, повозки и здания не принимают его внутрь. Летающие юниты
-  не занимают наземные клетки строительства и земляных работ.
-  Анимации, параметры и исходный атлас: mods/worldcraft/gorynych.
-  Для сетевого матча всем игрокам нужны одинаковые сборка и файлы мода.
+Rivers and water moats
+  The villager's second button in the third row opens waterworks.
+  The top row sets line width: 1, 3, or 5 tiles (default 3).
+  Second row: river line, river area, water moat line, moat area.
+  Bottom row: restoration line, restoration area, cancel, and back.
+  Lines expand to both sides with square ends. Diagonal tiles connect along edges.
+  Area size is the dragged rectangle; selected width has no effect on it.
+  The 256 limit includes the full width; an order exceeding it is rejected entirely.
+  Villagers work from the channel center toward its banks. A completed tile
+  immediately gets water at level -2; no water source is needed. Flow direction
+  runs from the start of the drag to its end. For a single tile, flow follows
+  the map's positive X axis. Flow is visual only and does not change ship speed.
+  Water moats have no flow.
+  Initial cost per elevation level changed: 5 wood and 10 seconds of work.
+  On flat ground, a two-level-deep tile costs 10 wood and 20 seconds of work.
+  Rivers block land units; ships pass if the channel is wide enough and banks are clear.
+  Water moats also block ships.
+  Obstacles move under the shared earthworks rules; buildings are preserved.
+  Their tiles are skipped, so a channel near a building may have gaps.
+  Restoration returns the original elevation and terrain type and removes flow.
+  To fill a wide body of water, start at an accessible bank; inaccessible
+  sites follow the shared queue rules.
+  Saves, replays, and networking carry order width and flow direction.
+  Changes behind fog of war remain hidden until the site is explored again.
 
-Следующие возможности
-  Другие задуманные существа ещё не реализованы. Озеро, река и водяной ров
-  не моделируют гидродинамику: вода занимает указанные клетки на фиксированном уровне.
+Formats
+  Simulation revision 10, network protocol 9, saves 18, replays AOKCREC7.
+  Saves and replays from the previous build are not automatically migrated.
+
+Gorynych
+  Each new random map starts with 10 peaceful neutral Gorynych dragons.
+  Bring a villager or fighter within 3 tiles: Gorynych permanently joins
+  the player and uses 5 population slots. Approaching cannot claim it again.
+  A villager raises Gorynych with the dragon button in the bottom command row:
+  400 wood, 300 gold, 120 seconds of work, 5 free population slots.
+  Click for one Gorynych, drag for a row, and use Shift to add to the queue.
+  If population space is insufficient, growing waits for free housing.
+  Gorynych has 900 hit points, speed 1.6 tiles/s, and fire range 5 tiles.
+  It flies over water, trees, mountains, and buildings. The three heads fire
+  at one target only while hovering: 12 pierce damage before armor per head,
+  a 3-second reload, and splash damage to nearby enemies within 0.6 tiles.
+  Ordinary melee attacks cannot reach Gorynych; ranged attacks can hit it.
+  Ships, wagons, and buildings do not accept it inside. Flying units do not
+  occupy ground tiles for construction or earthworks.
+  Animations, parameters, and source atlas: mods/worldcraft/gorynych.
+  For network play, everyone needs matching builds and mod files.
+
+Future features
+  Other planned creatures have not yet been implemented. Lakes, rivers, and
+  water moats do not simulate hydrodynamics: water occupies specified tiles at a fixed level.
+
+Installed language selection
+  The Windows installer saves the chosen English/Russian language for every launch.
+  No extra launch option is needed. --worldcraft-language en|ru overrides the
+  saved choice for one run; without a saved choice, English is used.

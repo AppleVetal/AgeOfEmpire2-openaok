@@ -37,15 +37,44 @@ namespace Core::worldcraft
     }
   }
 
-  bool load(const std::filesystem::path& root, std::string& error)
+  bool loadLanguagePreference(const std::filesystem::path& path, std::string& language, std::string& error)
   {
     error.clear();
     try
     {
+      // Source and portable runs without an installer preference use English.
+      if (!std::filesystem::exists(path))
+      {
+        language = "en";
+        return true;
+      }
+      std::ifstream input(path);
+      if (!input) throw std::runtime_error("cannot open language preference: " + path.string());
+      std::string candidate, extra;
+      if (!(input >> candidate) || (input >> extra) || input.bad() ||
+          (candidate != "en" && candidate != "ru"))
+        throw std::runtime_error("invalid language preference in " + path.string() + "; expected en or ru");
+      language = candidate;
+      return true;
+    }
+    catch (const std::exception& exception)
+    {
+      error = exception.what();
+      return false;
+    }
+  }
+
+  bool load(const std::filesystem::path& root, std::string& error, const std::string& language)
+  {
+    error.clear();
+    try
+    {
+      if (language != "en" && language != "ru")
+        throw std::runtime_error("unsupported Worldcraft language: " + language + "; expected en or ru");
       const auto manifest = read(root / "manifest.json");
       if (manifest.at("schema") != 1 || manifest.at("id") != "worldcraft" ||
           manifest.at("version") != "0.4.0" || manifest.at("rules") != "rules.json" ||
-          manifest.at("graphics") != "graphics.json" || manifest.at("strings") != "strings.ru.json")
+          manifest.at("graphics") != "graphics.json" || manifest.at("strings") != "strings.en.json")
         throw std::runtime_error("unsupported worldcraft manifest");
       const auto allRules = read(root / "rules.json");
       const auto rules = allRules.at("plant_tree");
@@ -65,12 +94,17 @@ namespace Core::worldcraft
       candidate.siteUnit = integer(art, "site_unit", 0, 32767);
       candidate.growingUnit = integer(art, "growing_unit", 0, 32767);
       candidate.buttonIcon = integer(art, "button_command_icon", 0, 63);
-      const auto words = read(root / "strings.ru.json");
+      const auto words = read(root / ("strings." + language + ".json"));
       std::map<std::string, std::string> labels;
       for (const auto* key : {"plant", "plant_help", "line", "area", "cancel", "cancel_help", "working", "growing", "choose_site",
           "raise_ground", "dig_ditch", "restore_ground", "dig_channel", "dig_lake", "earthwork_help", "line_shape", "area_shape",
           "earthwork_menu", "hill_height", "mountain_height", "high_mountain_height", "height_help",
-          "dig_river", "dig_water_moat", "waterwork_menu", "waterwork_help", "water_width"})
+          "dig_river", "dig_water_moat", "waterwork_menu", "waterwork_help", "water_width",
+          "treeman_name", "treeman_wild_name", "treeman_claimed_notice", "treeman_wild_help",
+          "treeman_grow", "treeman_help", "treeman_population_wait",
+          "transport_name", "transport_build", "transport_unload_help", "transport_help", "transport_population_wait",
+          "gorynych_name", "gorynych_wild_name", "gorynych_grow", "gorynych_claimed_notice",
+          "gorynych_wild_help", "gorynych_help", "gorynych_population_wait"})
       {
         const auto value = words.at(key).get<std::string>();
         if (value.empty() || value.size() > 4096) throw std::runtime_error(std::string("invalid text: ") + key);

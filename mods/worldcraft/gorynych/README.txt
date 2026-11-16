@@ -1,6 +1,8 @@
-Оригинальная графика Змея Горыныча создана встроенным ImageGen.
-Пять ракурсов, зеркальное отражение до восьми направлений; полёт, огнедыхание и гибель.
-Исходный атлас: source/atlas.png; запрос генерации: source/prompt.txt.
-Параметры юнита и русские подписи: unit.json.
-Игровая графика: gorynych.drs; привязки и время кадров: graphics.json и animations.json.
-Порядок добавления на карту и выращивания описан в ../README.txt.
+[Russian version](README_ru.txt)
+
+Gorynych's original artwork was created with the built-in ImageGen.
+Five views, mirrored to eight directions; flight, fire breathing, and death.
+Source atlas: source/atlas.png; generation prompt: source/prompt.txt.
+Unit parameters: unit.json. English and Russian labels: ../strings.en.json and ../strings.ru.json.
+Game artwork: gorynych.drs; bindings and frame timing: graphics.json and animations.json.
+Map placement and raising the unit are described in ../README.txt.

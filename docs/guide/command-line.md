@@ -9,6 +9,21 @@ cd build
 ./OpenAoK --game --map Arabia --size small --difficulty hard
 ```
 
+## Worldcraft language
+
+The Windows installer saves the selected language for Worldcraft's added unit
+names, commands, tooltips, and notifications. Every later launch uses that choice.
+`--worldcraft-language ru` or `--worldcraft-language en` overrides it for that
+launch. If neither an installed preference nor an option is present, English is
+used. The original game's text keeps the language of your game data.
+
+```sh
+./OpenAoK --worldcraft-language ru
+```
+
+Both language dictionaries are included in the content fingerprint, so choosing
+EN or RU does not change it. Players still need matching builds and package files.
+
 ## A game
 
 | Option | |

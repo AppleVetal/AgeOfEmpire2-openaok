@@ -67,13 +67,15 @@ def main():
     copy(support / "deps/freetype-2.13.3/docs/FTL.TXT", "LICENSES/FreeType.txt")
     copy(here / "Play-OpenAoK.cmd", "Play-OpenAoK.cmd")
     copy(here / "PLAY.txt", "PLAY.txt")
+    copy(here / "PLAY_ru.txt", "PLAY_ru.txt")
     (payload / ".openaok-worldcraft").write_text("OpenAoK Worldcraft installer v1\n", encoding="utf-8")
 
     required = ["assets/extracted_data/rules.json", "assets/extracted_data/strings.json",
         "assets/original/interfac_extracted/50500.bina", "assets/sprites/terrain/blendmasks.png",
         "original_game_1999/SYSTEM/FONTS/TIMES.TTF", "fonts/Arial.ttf", "fonts/Arial Bold.ttf",
         "mods/worldcraft/manifest.json", "mods/worldcraft/rules.json", "mods/worldcraft/graphics.json",
-        "mods/worldcraft/strings.ru.json", "original_game_1999/GAME/SOUND/STREAM/OPEN.MP3"]
+        "mods/worldcraft/strings.en.json", "mods/worldcraft/strings.ru.json",
+        "original_game_1999/GAME/SOUND/STREAM/OPEN.MP3"]
     for relative in required:
         if not (payload / relative).is_file():
             raise FileNotFoundError(f"Missing runtime file: {relative}")

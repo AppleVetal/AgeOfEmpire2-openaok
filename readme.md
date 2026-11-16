@@ -2,6 +2,11 @@
 
 [Русская версия](readme_ru.md)
 
+The Windows installer lets you choose English or Russian for Worldcraft and
+remembers your choice for later launches. Without an installed preference,
+English is the default. `--worldcraft-language en|ru` overrides the saved choice
+for one launch. The original game keeps the language of its data.
+
 ## Terrain and earthworks
 
 An extension of [OpenAoK](https://github.com/Zaydme/openaok) in C++20: villagers

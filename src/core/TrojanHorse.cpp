@@ -7,6 +7,7 @@
 
 #include "core/ConfigManager.h"
 #include "core/Rules.h"
+#include "core/Worldcraft.h"
 #include "core/Treeman.h"
 #include "core/Gorynych.h"
 #include "hal/SlpFile.h"
@@ -31,13 +32,6 @@ namespace Core::trojan_horse
       const auto number = value.get<int64_t>();
       if (number < low || number > high) throw std::runtime_error(std::string(key) + " is out of range");
       return static_cast<int>(number);
-    }
-
-    std::string label(const nlohmann::json& data, const char* key)
-    {
-      auto text = data.at(key).get<std::string>();
-      if (text.empty() || text.size() > 4096) throw std::runtime_error(std::string("invalid text: ") + key);
-      return text;
     }
 
     void replace(std::string& text, const char* token, int number)
@@ -84,10 +78,10 @@ namespace Core::trojan_horse
         if (passenger == nullptr || !canCarry(id, passenger->cls))
           throw std::runtime_error("invalid Trojan horse spear passenger");
       }
-      candidate.m_build = label(data, "build");
-      candidate.m_help = label(data, "help");
-      candidate.m_populationWait = label(data, "population_wait");
-      candidate.m_unloadHelp = label(data, "unload_help");
+      candidate.m_build = worldcraft::text("transport_build");
+      candidate.m_help = worldcraft::text("transport_help");
+      candidate.m_populationWait = worldcraft::text("transport_population_wait");
+      candidate.m_unloadHelp = worldcraft::text("transport_unload_help");
       replace(candidate.m_help, "{seats}", candidate.m_seats);
       replace(candidate.m_help, "{wood}", candidate.m_woodCost);
       replace(candidate.m_help, "{gold}", candidate.m_goldCost);
@@ -167,7 +161,7 @@ namespace Core::trojan_horse
       corpse.storage_count = 1;
       constexpr int decayResource = 12;
       corpse.storage[0] = {decayResource, Fixed32(integer(data, "corpse_seconds", 1, 3600)), 0};
-      const Rules::UnitText name{"TROJAN", label(data, "name")};
+      const Rules::UnitText name{"TROJAN", worldcraft::text("transport_name")};
       const Rules::UnitText remains{"TROJAN_CORPSE", name.label};
       // All external values and collisions are checked before registering the units.
       for (std::size_t i = 0; i < art.size(); ++i)

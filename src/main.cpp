@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <chrono>
 #include <memory>
+#include <filesystem>
 #include <thread>
 #include <string>
 #include <cstdlib>
@@ -193,9 +194,9 @@ struct Launch {
     HAL::Window::Config window;
 };
 
-bool LoadData() {
+bool LoadData(const std::string& worldcraftLanguage) {
     std::string contentError;
-    if (!Core::worldcraft::load("../mods/worldcraft", contentError))
+    if (!Core::worldcraft::load("../mods/worldcraft", contentError, worldcraftLanguage))
     {
       std::cerr << "[Worldcraft] " << contentError << std::endl;
       return false;
@@ -260,7 +261,10 @@ void ParseFlags(int argc, char* argv[], Launch& launch) {
     auto& win_config = launch.window;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--vsync") {
+        if (arg == "--worldcraft-language" && i + 1 < argc) {
+            // Already validated before loading the add-on and its unit names.
+            ++i;
+        } else if (arg == "--vsync") {
             win_config.vsync = true;
         } else if (arg == "--no-vsync") {
             // Benchmarking: frames as fast as the frame cap allows.
@@ -1829,6 +1833,26 @@ void PrintToLog() {
 
 int main(int argc, char* argv[]) {
     if (!HAL::Platform::Start(argc, argv)) return 0;
+#ifdef _WIN32
+    // Installed games resolve their data and language beside the executable.
+    const std::unique_ptr<char, decltype(&SDL_free)> basePath(SDL_GetBasePath(), SDL_free);
+    if (!basePath)
+    {
+      std::cerr << "[App] cannot locate the executable: " << SDL_GetError() << std::endl;
+      return -1;
+    }
+    try
+    {
+      const auto executableDirectory = std::filesystem::u8path(basePath.get());
+      if (std::filesystem::exists(executableDirectory / "../.openaok-worldcraft"))
+        std::filesystem::current_path(executableDirectory);
+    }
+    catch (const std::exception& error)
+    {
+      std::cerr << "[App] cannot enter the installed game directory: " << error.what() << std::endl;
+      return -1;
+    }
+#endif
 #ifdef __ANDROID__
     PrintToLog();
     // A phone has OpenGL ES, not desktop OpenGL. The game's data, a folder the
@@ -1868,7 +1892,32 @@ int main(int argc, char* argv[]) {
 #endif
     SDL_SetHint(SDL_HINT_RENDER_BATCHING, "1");
 
-    if (!LoadData()) return -1;
+    std::string worldcraftLanguage;
+    for (int i = 1; i < argc; ++i)
+    {
+      if (std::string(argv[i]) != "--worldcraft-language") continue;
+      if (i + 1 >= argc)
+      {
+        std::cerr << "[Worldcraft] --worldcraft-language requires en or ru" << std::endl;
+        return -1;
+      }
+      worldcraftLanguage = argv[++i];
+      if (worldcraftLanguage != "en" && worldcraftLanguage != "ru")
+      {
+        std::cerr << "[Worldcraft] unsupported language: " << worldcraftLanguage << "; expected en or ru" << std::endl;
+        return -1;
+      }
+    }
+    if (worldcraftLanguage.empty())
+    {
+      std::string languageError;
+      if (!Core::worldcraft::loadLanguagePreference("worldcraft-language.txt", worldcraftLanguage, languageError))
+      {
+        std::cerr << "[Worldcraft] " << languageError << std::endl;
+        return -1;
+      }
+    }
+    if (!LoadData(worldcraftLanguage)) return -1;
 
     Launch launch;
     launch.window.title = "OpenAoK";
