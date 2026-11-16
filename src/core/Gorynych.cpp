@@ -7,6 +7,7 @@
 
 #include "core/ConfigManager.h"
 #include "core/Rules.h"
+#include "core/Worldcraft.h"
 #include "hal/SlpFile.h"
 
 namespace Core::gorynych
@@ -29,13 +30,6 @@ namespace Core::gorynych
       const auto number = value.get<int64_t>();
       if (number < low || number > high) throw std::runtime_error(std::string(key) + " is out of range");
       return static_cast<int>(number);
-    }
-
-    std::string label(const nlohmann::json& data, const char* key)
-    {
-      auto text = data.at(key).get<std::string>();
-      if (text.empty() || text.size() > 4096) throw std::runtime_error(std::string("invalid text: ") + key);
-      return text;
     }
 
     void replace(std::string& text, const char* token, int number)
@@ -77,10 +71,10 @@ namespace Core::gorynych
       candidate.m_wildCount = integer(data, "wild_count", 1, 64);
       candidate.m_wildStartDistance = integer(data, "wild_start_distance", 4, 32);
       candidate.m_tameRadius = integer(data, "tame_radius", 1, 8);
-      candidate.m_grow = label(data, "grow");
-      candidate.m_help = label(data, "help");
-      candidate.m_populationWait = label(data, "population_wait");
-      candidate.m_claimedNotice = label(data, "claimed_notice");
+      candidate.m_grow = worldcraft::text("gorynych_grow");
+      candidate.m_help = worldcraft::text("gorynych_help");
+      candidate.m_populationWait = worldcraft::text("gorynych_population_wait");
+      candidate.m_claimedNotice = worldcraft::text("gorynych_claimed_notice");
       replace(candidate.m_help, "{wood}", candidate.m_woodCost);
       replace(candidate.m_help, "{gold}", candidate.m_goldCost);
       replace(candidate.m_help, "{seconds}", (candidate.m_workMs + 999) / 1000);
@@ -169,7 +163,7 @@ namespace Core::gorynych
       corpse.storage_count = 1;
       constexpr int decayResource = 12;
       corpse.storage[0] = {decayResource, Fixed32(integer(data, "corpse_seconds", 1, 3600)), 0};
-      const Rules::UnitText name{"GORYNYCH", label(data, "name")};
+      const Rules::UnitText name{"GORYNYCH", worldcraft::text("gorynych_name")};
       const Rules::UnitText remains{"GORYNYCH_CORPSE", name.label};
       auto wild = unit;
       constexpr int livestockClass = 58;
@@ -187,8 +181,8 @@ namespace Core::gorynych
       wild.tasks[0].action = Rules::TaskAction::Graze;
       wild.tasks[1] = {};
       wild.tasks[1].action = Rules::TaskAction::AutoConvert;
-      const Rules::UnitText wildName{"GORYNYCH_WILD", label(data, "wild_name")};
-      auto wildHelp = label(data, "wild_help");
+      const Rules::UnitText wildName{"GORYNYCH_WILD", worldcraft::text("gorynych_wild_name")};
+      auto wildHelp = worldcraft::text("gorynych_wild_help");
       replace(wildHelp, "{population}", candidate.m_population);
       replace(wildHelp, "{radius}", candidate.m_tameRadius);
       auto projectile = *fire;

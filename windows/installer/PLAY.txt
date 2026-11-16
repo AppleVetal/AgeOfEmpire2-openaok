@@ -1,78 +1,90 @@
+[Russian version](PLAY_ru.txt)
+
 OpenAoK Worldcraft 0.4.0
 
-Запуск
-  Откройте ярлык OpenAoK Worldcraft на рабочем столе или в меню «Пуск».
-  Можно также запустить Play-OpenAoK.cmd из папки установки.
-  Python, Visual Studio и другие средства разработки не нужны.
+Launch
+  Open the OpenAoK Worldcraft shortcut on the desktop or in the Start menu.
+  You can also run Play-OpenAoK.cmd from the installation folder.
+  Python, Visual Studio, and other development tools are not required.
 
-Посадка леса
-  Выберите одного или нескольких жителей.
-  Во втором ряду панели команд нажмите три дерева в линию или квадрат деревьев.
-  Зажмите левую кнопку мыши на карте, протяните и отпустите.
-  Один щелчок — одно дерево. Shift — добавить в очередь; Esc — выйти из режима.
-  Крестик отменяет незавершённые работы в очередях выбранных жителей.
-  Цена дерева — 10 древесины, работа одного жителя — 10 секунд, рост — 60 секунд.
-  Выросшие деревья рубятся обычным приказом.
+Worldcraft interface language
+  Choose English or Русский on the Worldcraft language page during installation.
+  The game remembers this choice for shortcuts, Play-OpenAoK.cmd, and the EXE.
+  No language option is needed when starting the installed game. Re-running
+  the installer lets you change the saved choice; it starts with your last selection.
+  This changes only Worldcraft additions; the original game's language
+  comes from your game data. Russian instructions are in PLAY_ru.txt.
+  For a one-time override, use --worldcraft-language en or --worldcraft-language ru.
 
-Сетевая игра
-  На обоих компьютерах установите один и тот же комплект.
-  Один игрок создаёт матч, второй подключается по локальному IP-адресу хоста.
-  При запросе брандмауэра Windows разрешите игре доступ к вашей частной сети.
+Planting forests
+  Select one or more villagers.
+  In the second command-panel row, press the line of three trees or tree square.
+  Hold the left mouse button on the map, drag, and release.
+  One click plants one tree. Shift adds to the queue; Esc exits placement.
+  The cross cancels unfinished work in the selected villagers' queues.
+  A tree costs 10 wood, 10 seconds of work for one villager, and 60 seconds of growth.
+  Fully grown trees are chopped with the ordinary command.
 
-Горы, рвы, канавы и озёра
-  Выберите жителей. Четвёртая кнопка второго ряда открывает земляные работы.
-  Первые три кнопки выбирают высоту: холм, гора или высокая гора.
-  По умолчанию гора сравнима по высоте с башней или замком.
-  Далее идут пары кнопок: гора, ров, восстановление земли, канава и озеро.
-  Один ряд значков — линия; квадрат значков — прямоугольная область.
-  Последние две кнопки — отмена работ и возврат к обычной панели.
-  Протяните мышью участок. Shift добавляет работу в очередь, крестик отменяет
-  незавершённые задания с возвратом неиспользованной части стоимости.
-  Склоны вокруг выбранного участка создаются автоматически и входят в цену.
-  Повторный приказ увеличивает высоту; предел — 24 уровня.
-  Пологие склоны проходимы, крутые и сухие рвы — преграды. Ров можно засыпать
-  восстановлением поверхности; гора при восстановлении возвращается к её
-  исходному рельефу. Уже выполненные участки не отменяются крестиком.
-  Цена за уровень клетки: гора — 10 древесины и 15 секунд труда;
-  ров, озеро и восстановление — 5 древесины и 10 секунд;
-  канава — 3 древесины и 5 секунд. Несколько жителей ускоряют работу.
-  Сухой ров имеет глубину два уровня относительно поверхности.
-  Участок должен быть разведан. Существа, деревья и ресурсы смещаются в
-  свободное место; если места нет, работа ожидает. Вода под сухими работами
-  засыпается песком. Гору можно построить вплотную к зданию: основание здания
-  сохраняется. До 256 выбранных клеток в приказе, плюс автоматические склоны.
-  Канава глубиной один уровень проходима. Озеро создаёт воду на уровне -2.
+Multiplayer
+  Install the same package on both computers.
+  One player creates a match; the other connects using the host's local IP address.
+  If Windows Firewall asks, allow the game on your private network.
 
-Реки и водяные рвы
-  Выберите жителя и вторую кнопку третьего ряда команд.
-  Выберите ширину линии 1/3/5 клеток, затем реку или ров, линию или область.
-  Протяните мышью русло. Готовые клетки сразу заполняются водой.
-  Течение реки отображается от начала линии к концу; скорость кораблей не меняет.
-  Широкая река доступна кораблям. Водяной ров закрыт и для кораблей.
-  Сухопутные юниты не пересекают ни реку, ни водяной ров.
-  Нижний ряд меню позволяет восстановить исходную землю, отменить работу и выйти.
-  Ширина относится к линии, размер области задаётся мышью.
-  На ровной земле клетка стоит 10 древесины и 20 секунд труда одного жителя.
+Mountains, dry moats, ditches, and lakes
+  Select villagers. The fourth button in the second row opens earthworks.
+  The first three buttons choose height: hill, mountain, or tall mountain.
+  The default mountain is roughly as tall as a tower or castle.
+  Next come button pairs: mountain, dry moat, terrain restoration, ditch, and lake.
+  A row of icons selects a line; a square of icons selects a rectangular area.
+  The last two buttons cancel work and return to the normal panel.
+  Drag over the site. Shift queues work; the cross cancels unfinished tasks
+  and refunds the unused part of their cost.
+  Slopes around the selected site are created automatically and included in the price.
+  Repeating an order increases height, up to 24 levels.
+  Gentle slopes are traversable; steep slopes and dry moats are barriers.
+  Restore terrain to fill a moat or return a mountain to its original surface.
+  The cross does not undo completed tiles.
+  Cost per tile level: mountain — 10 wood and 15 seconds of work;
+  dry moat, lake, and restoration — 5 wood and 10 seconds;
+  shallow ditch — 3 wood and 5 seconds. Multiple villagers speed up work.
+  A dry moat is two levels below the surface.
+  The site must be explored. Creatures, trees, and resources move to free space;
+  work waits if no space is available. Dry earthworks replace water with sand.
+  Mountains can be built right next to buildings: foundations are preserved.
+  Up to 256 selected tiles per order, plus automatic slopes.
+  A one-level ditch is traversable. A lake creates water at elevation -2.
 
-Ходячее дерево
-  Первая кнопка третьего ряда жителя выращивает древня: 200 древесины,
-  50 золота, 60 секунд труда и 3 места населения.
-  На новой случайной карте есть 10 мирных диких древней. Подведите юнита
-  на расстояние трёх клеток — древень навсегда присоединится к вам.
+Rivers and water moats
+  Select a villager and the second button in the third command row.
+  Choose line width 1/3/5 tiles, then river or moat, line or area.
+  Drag out a channel. Completed tiles fill with water immediately.
+  River flow is shown from the line's start to its end; it does not change ship speed.
+  Ships can use wide rivers. Water moats also block ships.
+  Land units cannot cross either rivers or water moats.
+  The bottom menu row restores original terrain, cancels work, and exits.
+  Width applies to lines; drag to determine an area's size.
+  On flat ground, a tile costs 10 wood and 20 seconds of work for one villager.
 
-Сохранения
-  Сохранения и профиль находятся в %APPDATA%\OpenAoK, отдельно от игры.
-  Удаление программы их сохраняет. Старые сохранения предыдущих версий
-  движка автоматически не преобразуются.
+Walking Tree
+  The first button in the villager's third row grows a treant: 200 wood,
+  50 gold, 60 seconds of work, and 3 population slots.
+  A new random map has 10 peaceful wild treants. Bring a unit within
+  three tiles and the treant will join you permanently.
 
-Состояние этой версии
-  Доступны выращивание леса, рубка, горы со склонами, сухие рвы и восстановление
-  земли, мелкие канавы, озёра, реки с визуальным течением, водяные рвы и древни.
-  Известны задержка развития ИИ и отсутствие дополнительного DEMO.SCN.
+Saves
+  Saves and the profile are stored in %APPDATA%\OpenAoK, separate from the game.
+  Uninstallation preserves them. Old saves from earlier engine versions
+  are not automatically converted.
 
-Комплект
-  Это локальная сборка из предоставленных пользователем игровых данных.
-  Для переноса на свой компьютер достаточно одного файла установщика.
-  Файлы Age of Empires II и шрифты сохраняют права своих владельцев;
-  лицензия движка и уведомления о библиотеках находятся в папке установки.
-  Исходники движка: https://github.com/AppleVetal/AgeOfEmpire2-openaok
+Status of this version
+  Forest growing, woodcutting, mountains with slopes, dry moats, terrain
+  restoration, shallow ditches, lakes, rivers with visible flow, water moats,
+  and treants are available.
+  Known issues include delayed AI development and the missing bonus DEMO.SCN.
+
+Package
+  This is a local build using game data supplied by the user.
+  A single installer file is enough to transfer it to your computer.
+  Age of Empires II files and fonts retain their owners' rights;
+  the engine license and library notices are in the installation folder.
+  Engine source: https://github.com/AppleVetal/AgeOfEmpire2-openaok

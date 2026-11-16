@@ -1,4 +1,5 @@
 """Install into an isolated folder, verify runtime files, exercise the game, then uninstall."""
+import argparse
 import hashlib
 import json
 import os
@@ -14,6 +15,9 @@ def sha256(path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--game-language", choices=("en", "ru"), default="ru")
+    args = parser.parse_args()
     repo = Path(__file__).resolve().parents[2]
     receipt = json.loads((repo.parent / "installers/installer-manifest.json").read_text())
     work = Path(receipt["work"]).resolve()
@@ -37,7 +41,7 @@ def main():
         raise RuntimeError("The installer changed after packaging")
     # NSIS requires the final /D= path to be unquoted, including spaces.
     # Pass a Windows command line directly, without invoking a shell.
-    install_command = subprocess.list2cmdline([receipt["installer"], "/S"]) + " /D=" + str(destination)
+    install_command = subprocess.list2cmdline([receipt["installer"], "/S", "/GAME_LANGUAGE=" + args.game_language]) + " /D=" + str(destination)
     installed = subprocess.run(install_command, env=env,
         startupinfo=startup, creationflags=subprocess.CREATE_NO_WINDOW, timeout=300)
     if installed.returncode:
@@ -48,15 +52,22 @@ def main():
         if not actual.is_file() or actual.stat().st_size != expected["bytes"] or sha256(actual) != expected["sha256"]:
             raise RuntimeError(f"Installed file differs: {relative}")
     results["filesVerified"] = len(manifest)
+    preference = destination / "build/worldcraft-language.txt"
+    if preference.read_text(encoding="ascii").strip() != args.game_language:
+        raise RuntimeError("The installed game language was not saved")
+    results["gameLanguage"] = args.game_language
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, registry_path) as key:
         if Path(winreg.QueryValueEx(key, "InstallLocation")[0]) != destination:
             raise RuntimeError("Incorrect uninstall registration")
+        if winreg.QueryValueEx(key, "GameLanguage")[0] != args.game_language:
+            raise RuntimeError("The installer did not remember the game language")
     print(f"Installed and verified {len(manifest)} files", flush=True)
     binary = destination / "build/OpenAoK.exe"
 
     def game(name, arguments, custom_env=None):
         with (work / f"{name}.stdout.log").open("wb") as output, (work / f"{name}.stderr.log").open("wb") as errors:
-            process = subprocess.run([str(binary), *arguments], cwd=binary.parent, env=custom_env or env,
+            # Direct EXE launches must find the installed data from another folder.
+            process = subprocess.run([str(binary), *arguments], cwd=destination, env=custom_env or env,
                 stdout=output, stderr=errors, startupinfo=startup,
                 creationflags=subprocess.CREATE_NO_WINDOW, timeout=300)
         results[name] = process.returncode
@@ -91,6 +102,8 @@ def main():
     if uninstalled.returncode:
         raise RuntimeError(f"Uninstall failed: {uninstalled.returncode}")
     remaining = [relative for relative in manifest if (destination / relative).exists()]
+    if preference.exists():
+        remaining.append("build/worldcraft-language.txt")
     if remaining or keep.read_text(encoding="utf-8") != "keep after uninstall\n":
         raise RuntimeError(f"Uninstall failed to remove only its own files: {remaining[:5]}")
     try:

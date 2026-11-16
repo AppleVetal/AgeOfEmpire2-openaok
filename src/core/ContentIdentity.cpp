@@ -79,7 +79,7 @@ namespace Core::content
       "original/Data/graphics.drs", "original/Data/interfac.drs",
       "original/Data/terrain.drs", "original/Data/sounds.drs",
       "../mods/worldcraft/manifest.json", "../mods/worldcraft/rules.json",
-      "../mods/worldcraft/graphics.json", "../mods/worldcraft/strings.ru.json",
+      "../mods/worldcraft/graphics.json", "../mods/worldcraft/strings.en.json", "../mods/worldcraft/strings.ru.json",
       "../mods/worldcraft/treeman/unit.json", "../mods/worldcraft/treeman/graphics.json",
       "../mods/worldcraft/transport/unit.json", "../mods/worldcraft/transport/graphics.json",
       "../mods/worldcraft/transport/animations.json", "../mods/worldcraft/transport/trojan-horse.drs",

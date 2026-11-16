@@ -7,6 +7,7 @@
 
 #include "core/ConfigManager.h"
 #include "core/Rules.h"
+#include "core/Worldcraft.h"
 #include "hal/SlpFile.h"
 
 namespace Core::treeman
@@ -29,13 +30,6 @@ namespace Core::treeman
       const auto number = value.get<int64_t>();
       if (number < low || number > high) throw std::runtime_error(std::string(key) + " is out of range");
       return static_cast<int>(number);
-    }
-
-    std::string label(const nlohmann::json& data, const char* key)
-    {
-      auto text = data.at(key).get<std::string>();
-      if (text.empty() || text.size() > 4096) throw std::runtime_error(std::string("invalid text: ") + key);
-      return text;
     }
 
     void replace(std::string& text, const char* token, int number)
@@ -73,10 +67,10 @@ namespace Core::treeman
       candidate.m_wildCount = integer(data, "wild_count", 1, 64);
       candidate.m_wildStartDistance = integer(data, "wild_start_distance", 4, 32);
       candidate.m_tameRadius = integer(data, "tame_radius", 1, 8);
-      candidate.grow = label(data, "grow");
-      candidate.help = label(data, "help");
-      candidate.populationWait = label(data, "population_wait");
-      candidate.m_claimedNotice = label(data, "claimed_notice");
+      candidate.grow = worldcraft::text("treeman_grow");
+      candidate.help = worldcraft::text("treeman_help");
+      candidate.populationWait = worldcraft::text("treeman_population_wait");
+      candidate.m_claimedNotice = worldcraft::text("treeman_claimed_notice");
       replace(candidate.help, "{wood}", candidate.woodCost);
       replace(candidate.help, "{gold}", candidate.goldCost);
       replace(candidate.help, "{seconds}", (candidate.workMs + 999) / 1000);
@@ -154,7 +148,7 @@ namespace Core::treeman
       corpse.storage_count = 1;
       constexpr int decayResource = 12;
       corpse.storage[0] = {decayResource, Fixed32(integer(data, "corpse_seconds", 1, 3600)), 0};
-      const Rules::UnitText name{"WALKTREE", label(data, "name")};
+      const Rules::UnitText name{"WALKTREE", worldcraft::text("treeman_name")};
       const Rules::UnitText remains{"WALKTREE_CORPSE", name.label};
       auto wild = unit;
       constexpr int livestockClass = 58;
@@ -172,8 +166,8 @@ namespace Core::treeman
       wild.tasks[0].action = Rules::TaskAction::Graze;
       wild.tasks[1] = {};
       wild.tasks[1].action = Rules::TaskAction::AutoConvert;
-      const Rules::UnitText wildName{"WALKTREE_WILD", label(data, "wild_name")};
-      auto wildHelp = label(data, "wild_help");
+      const Rules::UnitText wildName{"WALKTREE_WILD", worldcraft::text("treeman_wild_name")};
+      auto wildHelp = worldcraft::text("treeman_wild_help");
       replace(wildHelp, "{population}", candidate.population);
       replace(wildHelp, "{radius}", candidate.m_tameRadius);
       // All external values and collisions are checked before registering the units.

@@ -1,63 +1,65 @@
-Проверка «Ходячего дерева», 2026-11-06
+[Russian version](TREEMAN-VERIFICATION_ru.txt)
 
-Ветка: treeman-unit, основание: 3fffce8.
-Сборка: C++20, Windows x64, Release; Build-Native.ps1 -Jobs 8 завершён успешно.
-SHA-256 OpenAoK.exe:
+Walking Tree verification, 2026-11-06
+
+Branch: treeman-unit, base: 3fffce8.
+Build: C++20, Windows x64, Release; Build-Native.ps1 -Jobs 8 completed successfully.
+SHA-256 of OpenAoK.exe:
 61a87993d199624e15d85f4a7c4794f3cccaec22962b1938533e186f4ae51a07
 
-До реализации новая проверка завершалась с:
+Before implementation, the new check ended with:
   treeman=walking tree is not registered
-Перед добавлением диких древней проверка завершалась с:
+Before adding wild treants, the check ended with:
   treeman=wild walking tree is not registered
-После реализации: python local-support/Verify-Treeman.py — 15/15, exit 0.
-Проверены 260 кадров SLP, кнопка жителя, запрет приказа чужому жителю,
-оплата дерева/золота и возврат при отмене, резервирование клетки,
-ожидание населения, появление бойца и освобождение клетки, движение,
-попадание на кадре 12 (960 мс), урон, гибель, освобождение населения,
-собственные останки, сохранение/загрузка при выращивании и после него,
-запись/воспроизведение матча, одинаковое выращивание у двух TCP-участников.
-На всех 15 стандартных типах случайных карт проверены 10 нейтральных древней:
-сухопутное размещение вдали от стартов, отсутствие атаки и добываемых ресурсов.
-Проверены приручение ближайшим игроком, равное расстояние двух претендентов,
-бесплатное присоединение, учёт населения сверх лимита и запрет повторного
-переманивания приближением. Полное раскрытие карты само по себе не приручает.
-Проверены сохранения до и после приручения, продолжение после загрузки,
-записанный приказ движения к дикому древню и воспроизведение результата,
-приказы обоих TCP-участников с выращиванием и приручением у каждого.
-Сетевой тест выполнялся через loopback на одном компьютере.
+After implementation: python local-support/Verify-Treeman.py — 15/15, exit 0.
+Checked 260 SLP frames, the villager button, rejection of orders to another
+player's villager, wood/gold payment and refunds, tile reservation, waiting
+for population space, fighter creation and tile release, movement, the hit
+on frame 12 (960 ms), damage, death, population release, custom remains,
+save/load during and after growing, recording/replay, and identical growing
+on two TCP participants.
+On all 15 standard random map types, checked 10 neutral treants:
+land placement away from starting bases, no attacks, and no gatherable resources.
+Checked taming by the nearest player, equal distance between two claimants,
+free joining, population accounting above the limit, and no repeated claiming
+by approaching. Revealing the whole map alone does not tame them.
+Checked saves before and after taming, continuing after loading, recording
+a move order toward a wild treant and replaying the result, and orders from
+both TCP participants with growing and taming for each.
+The network test used loopback on one computer.
 
-Полный прогон: 125/128. Новых сбоев по сравнению с базой дополнения 125/128 нет.
-Сохраняются три исходные ошибки:
+Full run: 125/128. No new failures compared with the mod baseline of 125/128.
+The three original failures remain:
   ai=a hardest computer player reached the Feudal Age late
   scenario=DEMO.SCN unread: cannot open the file
   editor=DEMO.SCN unread: cannot open
-Контрольная сумма симуляции намеренно изменена: на карте добавлены 10 юнитов.
-Новый результат подтверждён двумя отдельными запусками перед обновлением GOLDEN
-и повторно полным прогоном:
+The simulation checksum intentionally changed because 10 units were added to the map.
+The new result was confirmed by two separate runs before updating GOLDEN
+and then by the full run:
   entities=1980 ticks=3000 hash=81c5afed8b236eaa
-Нарушений fixed-point в исходниках симуляции: 0.
+Violations of the fixed-point rule in simulation source: 0.
 
-Два теста движения (carryon/setoff) проводят постановочный бой без диких
-древней: иначе присоединившиеся бойцы меняют состав участников. Убрано обращение
-к уже удалённому солдату при подсчёте результата. Оба теста успешны;
-setoff: routed=100/100, near=100; carryon: mean=1.2.
-Во всех остальных случайных игровых мирах дикие древни сохраняются.
+Two movement tests (carryon/setoff) use a staged battle without wild
+treants, since claimed fighters would change the participants.
+Removed access to an already deleted soldier when counting the result.
+Both tests pass: setoff: routed=100/100, near=100; carryon: mean=1.2.
+All other random game worlds retain wild treants.
 
-Формат изменённых C++-файлов проверен Normalize-CppSourceFormat.ps1.
-git diff --check: ошибок нет.
+The changed C++ source formatting was checked with Normalize-CppSourceFormat.ps1.
+git diff --check: no errors.
 
-Просмотрены снимки настоящей игры в OpenAoK-build-support/captures/earthworks:
-  treeman-game.png — готовый древень и его показатели;
-  treeman-controls.png — кнопка выращивания и подсказка;
-  treeman-placement.png — предпросмотр после нажатия кнопки.
-  wild-treeman.png — нейтральный древень, портрет и подсказка приручения;
-  tamed-treeman.png — принадлежащий игроку боец и уведомление о присоединении.
-Матч и повтор: OpenAoK-build-support/captures/treeman/treeman.sav и treeman.mgl.
-Сохранения до/после приручения: wild-treeman.sav и tamed-treeman.sav там же.
-Отчёты: OpenAoK-build-support/logs/wild-treeman-*.summary.json.
+Real gameplay screenshots in OpenAoK-build-support/captures/earthworks were reviewed:
+  treeman-game.png — completed treant and its stats;
+  treeman-controls.png — grow button and tooltip;
+  treeman-placement.png — preview after pressing the button.
+  wild-treeman.png — neutral treant, portrait, and taming tooltip;
+  tamed-treeman.png — player-owned fighter and joining notification.
+Match and replay: treeman.sav and treeman.mgl in OpenAoK-build-support/captures/treeman.
+Saves before/after taming: wild-treeman.sav and tamed-treeman.sav in the same folder.
+Reports: OpenAoK-build-support/logs/wild-treeman-*.summary.json.
 
-Ревизия симуляции 6, формат сохранений 16. Старая ревизия несовместима.
-Для новых древней начните случайную карту; готовые сценарии не изменяются.
-Графика поставляется отдельным пользовательским DRS; оригинальные архивы
-не изменены. Собственных звуков, тени и перекраски в цвет игрока в исходном
-пакете нет. Установка игры, коммит и отправка в GitHub не выполнялись.
+Simulation revision 6, save format 16. The previous revision is incompatible.
+Start a random map for new treants; existing scenarios are unchanged.
+Artwork is supplied in a separate custom DRS; original archives are unchanged.
+The original package has no custom sounds, shadow, or player-color remapping.
+Game installation, commit, and GitHub push were not performed.

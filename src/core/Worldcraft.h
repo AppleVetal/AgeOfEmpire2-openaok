@@ -33,7 +33,8 @@ namespace Core::worldcraft
     int goldCost = 0;
   };
 
-  bool load(const std::filesystem::path& root, std::string& error);
+  bool loadLanguagePreference(const std::filesystem::path& path, std::string& language, std::string& error);
+  bool load(const std::filesystem::path& root, std::string& error, const std::string& language = "en");
   bool validateArt(std::string& error);
   const PlantRules& plantRules();
   int builtUnit(WorldJobKind kind);

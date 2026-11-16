@@ -1,87 +1,89 @@
-OpenAoK / Worldcraft 0.3.0 — лес, высокие горы, рвы, канавы и озёра
-Дата проверки: 2026-11-06
-База upstream: 06a06b03d72ee2ee70c174f8bc4479bcf8867b01
-База уточнения: mountain 315b74cbbe6fbad10c745a3f31785fdf67f8c30f
-Ветка forest влита: https://github.com/AppleVetal/AgeOfEmpire2-openaok/pull/1
-MR земляных работ: https://github.com/AppleVetal/AgeOfEmpire2-openaok/pull/2
+[Russian version](CHECKPOINT_ru.txt)
 
-Реализовано
-  C++20, исправления горячих клавиш и AI-словаря для русских данных игры.
-  Проверка совместимости игровых данных, ревизии симуляции и пакета worldcraft.
-  Посадка деревьев по одному, линией и областью; рост, обычная рубка.
-  Общие задания жителей: оплата, Shift-очередь, несколько работников, отмена,
-  резервирование земли, сохранение, воспроизведение и сетевые команды.
-  Панель земляных работ: три высоты и пять пар кнопок линии/области.
-  Горы со склонами, сухие рвы, мелкие канавы, озёра и восстановление земли.
-  Место работы обозначается холмиком или ямкой вместо пня.
-  Существа, деревья, ресурсы и естественные обрывы переносятся в подходящее
-  свободное место при завершении работы. Отдельной анимации отхода нет.
-  Сохраняются здоровье, принадлежность, сущность и остаток ресурса.
-  Для многоклеточных обрывов переносится и освобождается весь занимаемый участок.
-  Вода под сухими работами заменяется песком. Восстановление возвращает
-  исходную высоту и покрытие, в том числе воду.
-  Работы разрешены вплотную к зданию; основание и общие с ним вершины защищены.
-  Пути, высота боя и видимость рельефа обновляются после завершения работ.
-  Туман войны не раскрывает скрытые изменения высоты и покрытия.
+OpenAoK / Worldcraft 0.3.0 — forests, tall mountains, dry moats, ditches, and lakes
+Verification date: 2026-11-06
+Upstream base: 06a06b03d72ee2ee70c174f8bc4479bcf8867b01
+Refinement base: mountain 315b74cbbe6fbad10c745a3f31785fdf67f8c30f
+Forest branch merged: https://github.com/AppleVetal/AgeOfEmpire2-openaok/pull/1
+Earthworks merge request: https://github.com/AppleVetal/AgeOfEmpire2-openaok/pull/2
 
-Параметры по умолчанию
-  Дерево: 10 древесины, 10 секунд работы одного жителя, 60 секунд роста.
-  Высоты подъёма: холм 4, гора 12 (по умолчанию), высокая гора 18 уровней.
-  Диапазон изменяемых высот от -4 до 24; повторный приказ повышает гору.
-  Склоны формируются в пределах шести клеток от выбранной клетки и входят в цену.
-  Гора: 10 древесины и 15 секунд работы за уровень подъёма выбранной клетки.
-  Ров, озеро и восстановление: 5 древесины и 10 секунд за уровень изменения.
-  Канава: 3 древесины и 5 секунд за уровень изменения.
-  Сухой ров глубиной два уровня непроходим, канава глубиной один проходима.
-  Озеро создаёт водные клетки на высоте -2 без моделирования течения.
-  До 256 выбранных клеток в приказе, участков у игрока и заданий у жителя.
-  Участок должен быть разведан, центральная клетка — видима при выдаче приказа.
-  Место для перемещения ищется в пределах 32 клеток. Если его нет хотя бы
-  для одного объекта, все изменения ожидают; повторная попытка через секунду.
-  За такт выполняется до двух попыток завершения земляных работ.
-  Настройки дополнения: mods/worldcraft; исходные ресурсы игры не изменяются.
+Implemented
+  C++20, hotkey and AI vocabulary fixes for Russian game data.
+  Compatibility checks for game data, simulation revision, and the worldcraft package.
+  Individual, line, and area tree planting; growth and ordinary woodcutting.
+  Shared villager tasks: payment, Shift queues, multiple workers, cancellation,
+  land reservation, saving, replaying, and network commands.
+  Earthworks panel: three heights and five pairs of line/area buttons.
+  Mountains with slopes, dry moats, shallow ditches, lakes, and terrain restoration.
+  A mound or pit marks the work site instead of a stump.
+  Creatures, trees, resources, and natural cliffs move to suitable free space
+  when work completes. There is no separate move-away animation.
+  Health, ownership, entity identity, and remaining resources are preserved.
+  Multi-tile cliffs move as a whole, freeing their entire previous footprint.
+  Dry earthworks replace water with sand. Restoration returns the original
+  elevation and terrain type, including water.
+  Work is allowed right next to buildings; foundations and shared vertices are protected.
+  Paths, combat height, and terrain visibility update when work completes.
+  Fog of war does not reveal hidden elevation or terrain-type changes.
 
-Проверки Windows Release / GCC 12.1.0 / C++20
-  До уточнения проверка высокой горы завершалась ошибкой:
+Default parameters
+  Tree: 10 wood, 10 seconds of work for one villager, 60 seconds of growth.
+  Raise heights: hill 4, mountain 12 (default), tall mountain 18 levels.
+  Editable elevation range: -4 to 24; repeating an order raises a mountain further.
+  Slopes form within six tiles of the selected tile and are included in the price.
+  Mountain: 10 wood and 15 seconds of work per raised level of the selected tile.
+  Dry moat, lake, and restoration: 5 wood and 10 seconds per changed level.
+  Shallow ditch: 3 wood and 5 seconds per changed level.
+  A two-level dry moat is impassable; a one-level ditch is traversable.
+  A lake creates water tiles at elevation -2 without flow simulation.
+  Up to 256 selected tiles per order, sites per player, and tasks per villager.
+  The site must be explored; the central tile must be visible when ordering.
+  Relocation searches within 32 tiles. If even one object has no free space,
+  all changes wait; another attempt is made after one second.
+  Up to two earthwork completion attempts are made per tick.
+  Mod settings: mods/worldcraft; original game assets are unchanged.
+
+Checks: Windows Release / GCC 12.1.0 / C++20
+  Before refinement, the tall-mountain check failed:
     earthworks=a tower-height mountain is capped at a small hill.
-  Проверка трёх высот выявила многоклеточное препятствие; после исправления
-  проходит на том же участке с естественными обрывами.
-  Целевые проверки: 13/13, код 0:
+  The three-height check exposed a multi-tile obstacle; after the fix,
+  it passes at the same site with natural cliffs.
+  Targeted checks: 13/13, exit code 0:
     earthworks, earthnet, worldjobs, forestnet, compatibility, help,
     save, recording, net, lobby, fog, foundations, combat.
-  Общий прогон: 124/127, код 3; до уточнения 124/127 с теми же тремя неудачами.
-  Эталон: entities=1970 ticks=3000 hash=221acd07913e73ac.
-  Нарушений запрета плавающей точки в симуляции: 0.
-  Проверены три высоты и загрузка готовых гор, ров и его засыпка жителями,
-  перенос жителя, всадника, птицы, овцы и дерева с сохранением состояния.
-  Проверены отсутствие частичных изменений при нехватке места, вода/песок,
-  превращение сухой канавы в озеро без изменения глубины, соседство со зданием.
-  Очередь сохраняется и загружается; повтор даёт идентичный мир через 40000 тактов.
-  Два TCP-участника завершили три горы и четыре секции рва через 30000 тактов;
-  состояния совпали. Сеть проверена на одном ПК, 127.0.0.1.
-  Все пять видов работ и три высоты проверены при кодировании сетевых команд.
-  В окне игры проверены три высоты, озеро, меню, ямки предпросмотра и холмик
-  после выдачи приказа мышью с оплатой.
-  Журналы и снимки находятся в соседнем OpenAoK-build-support, в Git не входят.
-  SHA-256 проверенного движка:
+  Full run: 124/127, exit code 3; before refinement: 124/127 with the same three failures.
+  Reference: entities=1970 ticks=3000 hash=221acd07913e73ac.
+  Violations of the no-floating-point rule in the simulation: 0.
+  Checked the three heights and loading completed mountains, a moat and villagers
+  filling it in, and moving a villager, rider, bird, sheep, and tree without state loss.
+  Checked that insufficient space causes no partial changes, water/sand replacement,
+  conversion of a dry ditch into a lake without changing depth, and adjacency to buildings.
+  The queue saves and loads; replay produces an identical world after 40000 ticks.
+  Two TCP participants completed three mountains and four moat sections after 30000 ticks;
+  their states matched. Networking was checked on one PC using 127.0.0.1.
+  All five work types and three heights were checked in network command encoding.
+  In the game window, checked three heights, a lake, the menu, preview pits, and a mound
+  after issuing a paid order with the mouse.
+  Logs and screenshots are in the neighboring OpenAoK-build-support folder, outside Git.
+  SHA-256 of the verified engine:
     3d37762a16252cd67bb7ee19af6edd8bba5a9feff7ecf64f33192bc254873ad9
 
-Оставшиеся неудачи
+Remaining failures
   ai: hardest computer player reached the Feudal Age late.
-  scenario и editor: отсутствует GOODIES/DEMO.SCN.
-  Порог развития ИИ не ослаблялся, отсутствующий сценарий не подменялся.
+  scenario and editor: GOODIES/DEMO.SCN is missing.
+  The AI development threshold was not relaxed; the missing scenario was not substituted.
 
-Совместимость и упаковка
-  Ревизия симуляции 4, протокол сети 8, сохранения 15, повторы AOKCREC6.
-  Старые сохранения и повторы автоматически не преобразуются.
-  Сборка, пакет дополнения и игровые данные должны совпадать у участников.
-  Хеш не охватывает все старые компоненты ИИ; внешние пользовательские
-  сценарии пока не входят в предварительную проверку данных.
-  Упаковщик Windows использует готовый движок и локальные игровые данные.
-  Установочные проверки после просьбы пользователя остановлены.
-  Игровые файлы, исполняемый файл, снимки и локальный установщик в Git не входят.
+Compatibility and packaging
+  Simulation revision 4, network protocol 8, saves 15, replays AOKCREC6.
+  Old saves and replays are not automatically converted.
+  Participants must have matching builds, mod packages, and game data.
+  The hash does not cover every older AI component; external custom scenarios
+  are not yet included in the preliminary data check.
+  The Windows packager uses the existing engine and local game data.
+  Installation checks were stopped at the user's request.
+  Game files, executable, screenshots, and local installer are not included in Git.
 
-Следующие этапы
-  Реки с течением; динозавры, ихтиозавры, киты и ходячие деревья;
-  драконы и ступа Бабы-яги; гигантские черви; баланс, новые спрайты и упаковка
-  дополнения для других платформ. Эти возможности ещё не реализованы.
+Next stages
+  Rivers with flow; dinosaurs, ichthyosaurs, whales, and walking trees;
+  dragons and Baba Yaga's mortar; giant worms; balancing, new sprites, and
+  mod packaging for other platforms. These features are not yet implemented.

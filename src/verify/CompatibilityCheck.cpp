@@ -8,6 +8,7 @@
 
 #include "core/ContentIdentity.h"
 #include "core/Random.h"
+#include "core/Worldcraft.h"
 #include "ecs/Digest.h"
 #include "ecs/Simulation.h"
 #include "ecs/components/Resource.h"
@@ -29,7 +30,7 @@ namespace Verify
       {
         if (!isCreated) return;
         std::error_code error;
-        for (const auto* name : {"a.json", "b.json", "record.mgl"})
+        for (const auto* name : {"a.json", "b.json", "record.mgl", "worldcraft-language.txt"})
           std::filesystem::remove(root / name, error);
         std::filesystem::remove(root, error);
       }
@@ -72,6 +73,28 @@ namespace Verify
         return "incompatible content was admitted to a game";
       for (const auto& peer : pair.host.peers)
         if (peer.row >= 0 || peer.seat != 0) return "incompatible content took a player seat";
+      return nullptr;
+    }
+
+    const char* checkLanguagePreference(const TestFiles& files)
+    {
+      const auto path = files.root / "worldcraft-language.txt";
+      std::string language = "ru", error;
+      if (!Core::worldcraft::loadLanguagePreference(path, language, error) || language != "en")
+        return "a missing language preference did not select English";
+      for (const auto* expected : {"en", "ru"})
+      {
+        std::ofstream(path, std::ios::binary) << expected << "\r\n";
+        if (!Core::worldcraft::loadLanguagePreference(path, language, error) || language != expected)
+          return "the installed language preference was not retained";
+      }
+      for (const auto* invalid : {"", "de", "en ru", "RU"})
+      {
+        std::ofstream(path, std::ios::binary) << invalid;
+        language = "ru";
+        if (Core::worldcraft::loadLanguagePreference(path, language, error) || error.empty() || language != "ru")
+          return "an invalid language preference was accepted or changed the output";
+      }
       return nullptr;
     }
 
@@ -172,6 +195,7 @@ namespace Verify
     std::error_code error;
     files.isCreated = std::filesystem::create_directory(files.root, error);
     const char* verdict = files.isCreated ? nullptr : "could not create the test directory";
+    if (verdict == nullptr) verdict = checkLanguagePreference(files);
     if (verdict == nullptr) verdict = checkIdentityFiles(files);
     if (verdict == nullptr) verdict = checkWorldDigest(files);
     for (const bool isLobby : {false, true})
